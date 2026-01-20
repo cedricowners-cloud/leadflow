@@ -18,7 +18,7 @@ const updateProductSchema = z.object({
   adjustment_rate: z
     .number()
     .min(0, "회사 조정률은 0 이상이어야 합니다")
-    .max(2, "회사 조정률은 200% 이하여야 합니다")
+    .max(10, "회사 조정률은 1000% 이하여야 합니다")
     .optional(),
   description: z.string().max(500).optional().nullable(),
 });
@@ -86,10 +86,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (!member || member.role !== "system_admin") {
-      return NextResponse.json(
-        { error: "권한이 없습니다" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     // 보험 상품 존재 확인
@@ -194,10 +191,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (!member || member.role !== "system_admin") {
-      return NextResponse.json(
-        { error: "권한이 없습니다" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     // 보험 상품 존재 확인
