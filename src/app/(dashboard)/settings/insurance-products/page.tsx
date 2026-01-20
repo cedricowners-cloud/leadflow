@@ -213,9 +213,10 @@ export default function InsuranceProductsPage() {
     return `${(rate * 100).toFixed(0)}%`;
   };
 
-  // Calculate effective rate
+  // Calculate effective rate (CMP율 = 환산율 / 조정률)
   const getEffectiveRate = (insurerRate: number, adjustmentRate: number) => {
-    return insurerRate * adjustmentRate;
+    if (adjustmentRate <= 0) return 0;
+    return insurerRate / adjustmentRate;
   };
 
   return (

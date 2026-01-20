@@ -28,25 +28,29 @@ export interface PerformanceSummary {
 }
 
 /**
- * 월납 금액과 이중 수수료율로 수수료 계산
- * 계산 공식: 월납 × 보험사 수수료율 × 회사 조정률
+ * 월납 금액과 이중 수수료율로 수수료(CMP) 계산
+ * 계산 공식: 월납 × 보험사 수수료 환산율 / 회사 조정률
+ *
+ * 예시: 월납 1,000,000원, 환산율 150%, 조정률 105%
+ *       CMP = 1,000,000 × 1.5 / 1.05 = 1,428,571원
  *
  * @param monthlyPayment 월납 금액 (원)
  * @param insurerCommissionRate 보험사 수수료 환산율 (예: 1.5 = 150%)
- * @param adjustmentRate 회사 조정률 (예: 1.0 = 100%)
- * @returns 계산된 수수료 (원)
+ * @param adjustmentRate 회사 조정률 (예: 1.05 = 105%)
+ * @returns 계산된 수수료/CMP (원)
  */
 export function calculateCommission(
   monthlyPayment: number,
   insurerCommissionRate: number,
   adjustmentRate: number = 1.0
 ): number {
-  if (monthlyPayment < 0 || insurerCommissionRate < 0 || adjustmentRate < 0) {
+  if (monthlyPayment < 0 || insurerCommissionRate < 0 || adjustmentRate <= 0) {
     return 0;
   }
 
   // 소수점 이하 반올림 (정수 원 단위)
-  return Math.round(monthlyPayment * insurerCommissionRate * adjustmentRate);
+  // CMP = 월납 × 환산율 / 조정률
+  return Math.round((monthlyPayment * insurerCommissionRate) / adjustmentRate);
 }
 
 /**
@@ -69,14 +73,18 @@ export function calculateCommissionWithProduct(
 }
 
 /**
- * 수수료율 2개를 하나의 유효 수수료율로 계산
- * (보험사 수수료율 × 회사 조정률)
+ * 수수료율 2개를 하나의 유효 수수료율(CMP율)로 계산
+ * CMP율 = 보험사 수수료 환산율 / 회사 조정률
+ *
+ * 예시: 환산율 150%, 조정률 105%
+ *       CMP율 = 1.5 / 1.05 = 1.4286 (142.86%)
  */
 export function getEffectiveCommissionRate(
   insurerCommissionRate: number,
   adjustmentRate: number
 ): number {
-  return insurerCommissionRate * adjustmentRate;
+  if (adjustmentRate <= 0) return 0;
+  return insurerCommissionRate / adjustmentRate;
 }
 
 /**
