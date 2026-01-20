@@ -6,8 +6,40 @@ import {
   evaluateQuickEligibility,
   MemberData,
   DistributionRule,
+  EligibilityThresholds,
 } from "@/lib/utils/distribution-eligibility";
 import { getPreviousMonth } from "@/lib/utils/commission-calculator";
+
+// 시스템 설정에서 배분 기준값 조회
+async function getDistributionThresholds(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<EligibilityThresholds> {
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", "distribution_eligibility_thresholds")
+    .single();
+
+  if (data?.value) {
+    const thresholds = data.value as {
+      grade_a_min_payment?: number;
+      grade_b_min_payment?: number;
+      grade_b_max_payment?: number;
+    };
+    return {
+      grade_a_min_payment: thresholds.grade_a_min_payment ?? 600000,
+      grade_b_min_payment: thresholds.grade_b_min_payment ?? 200000,
+      grade_b_max_payment: thresholds.grade_b_max_payment ?? 600000,
+    };
+  }
+
+  // 기본값 반환
+  return {
+    grade_a_min_payment: 600000,
+    grade_b_min_payment: 200000,
+    grade_b_max_payment: 600000,
+  };
+}
 
 // 테스트 요청 스키마
 const testRequestSchema = z.object({
@@ -131,7 +163,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 빠른 자격 평가 (기본 규칙 기반)
+    // 배분 기준값 조회 (DB에서)
+    const thresholds = await getDistributionThresholds(supabase);
+
+    // 빠른 자격 평가 (DB 기준값 사용)
     const monthlyPayment =
       memberData.previousMonthPerformance?.total_monthly_payment || 0;
     const isNewbieTestPassed =
@@ -139,7 +174,8 @@ export async function POST(request: NextRequest) {
 
     const quickEligibility = evaluateQuickEligibility(
       monthlyPayment,
-      isNewbieTestPassed
+      isNewbieTestPassed,
+      thresholds
     );
 
     // 등급별 자격 상태 계산 (제외 규칙 평가용)

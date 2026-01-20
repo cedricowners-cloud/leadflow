@@ -194,6 +194,36 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // 영업 관리자(sales_manager) 관련 manager_teams 테이블 업데이트
+    const adminClient = createAdminClient();
+    const wasManager = targetMember.role === "sales_manager";
+    const isManager = newRole === "sales_manager";
+    const teamChanged = newTeamId !== targetMember.team_id;
+
+    // 케이스 1: 영업 관리자에서 다른 역할로 변경 -> manager_teams에서 삭제
+    if (wasManager && !isManager) {
+      await adminClient.from("manager_teams").delete().eq("member_id", id);
+    }
+    // 케이스 2: 다른 역할에서 영업 관리자로 변경 -> manager_teams에 추가
+    else if (!wasManager && isManager && newTeamId) {
+      await adminClient.from("manager_teams").insert({
+        member_id: id,
+        team_id: newTeamId,
+      });
+    }
+    // 케이스 3: 영업 관리자 상태 유지하면서 팀 변경
+    else if (isManager && teamChanged) {
+      // 기존 팀 매핑 삭제
+      await adminClient.from("manager_teams").delete().eq("member_id", id);
+      // 새 팀 매핑 추가
+      if (newTeamId) {
+        await adminClient.from("manager_teams").insert({
+          member_id: id,
+          team_id: newTeamId,
+        });
+      }
+    }
+
     return NextResponse.json({ data: member });
   } catch (error) {
     console.error("Member API error:", error);

@@ -13,6 +13,9 @@ import {
   ChevronDown,
   Save,
   Package,
+  Check,
+  ChevronsUpDown,
+  User,
 } from "lucide-react";
 import { EligibilityCriteriaCard } from "@/components/distribution";
 import { Header } from "@/components/layout/header";
@@ -56,7 +59,21 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   calculateCommissionWithProduct,
   formatCurrency,
@@ -75,6 +92,7 @@ interface Team {
 interface Member {
   id: string;
   name: string;
+  role?: MemberRole;
   team: Team | null;
 }
 
@@ -84,6 +102,12 @@ interface InsuranceProduct {
   company: string | null;
   insurer_commission_rate: number;
   adjustment_rate: number;
+}
+
+interface AssignedLead {
+  id: string;
+  company_name: string | null;
+  representative_name: string | null;
 }
 
 interface PerformanceDetail {
@@ -139,6 +163,7 @@ export default function MemberPerformancePage() {
   const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
   const [currentMemberName, setCurrentMemberName] = useState<string | null>(null);
   const [currentMemberTeam, setCurrentMemberTeam] = useState<Team | null>(null);
+  const [managerTeams, setManagerTeams] = useState<Team[]>([]); // 영업 관리자가 담당하는 팀 목록
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -146,6 +171,9 @@ export default function MemberPerformancePage() {
   const [editingDetails, setEditingDetails] = useState<PerformanceDetail[]>([]);
   const [editingNotes, setEditingNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [assignedLeads, setAssignedLeads] = useState<AssignedLead[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [openClientPopover, setOpenClientPopover] = useState<number | null>(null);
 
   // Fetch current user info
   const fetchCurrentUser = useCallback(async () => {
@@ -165,6 +193,25 @@ export default function MemberPerformancePage() {
           // team can be an array due to Supabase's response format
           const team = Array.isArray(member.team) ? member.team[0] : member.team;
           setCurrentMemberTeam(team as Team | null);
+
+          // 영업 관리자인 경우 manager_teams에서 담당 팀 조회
+          if (member.role === "sales_manager") {
+            const { data: managerTeamsData } = await supabase
+              .from("manager_teams")
+              .select("team:teams(id, name)")
+              .eq("member_id", member.id);
+
+            if (managerTeamsData && managerTeamsData.length > 0) {
+              const teams = managerTeamsData
+                .map((mt) => (Array.isArray(mt.team) ? mt.team[0] : mt.team))
+                .filter((t): t is Team => t !== null);
+              setManagerTeams(teams);
+              // 첫 번째 담당 팀을 기본 선택
+              if (teams.length > 0) {
+                setSelectedTeamId(teams[0].id);
+              }
+            }
+          }
         }
       }
     } catch (error) {
@@ -185,18 +232,35 @@ export default function MemberPerformancePage() {
     }
   }, []);
 
-  // Fetch members (team leaders only)
+  // Fetch members (team leaders and sales managers for system_admin)
   const fetchMembers = useCallback(async () => {
     try {
-      const response = await fetch("/api/members?role=team_leader&is_active=true");
-      const result = await response.json();
-      if (result.data) {
-        setMembers(result.data);
+      // 시스템 관리자인 경우 팀장과 영업 관리자 모두 조회
+      // 영업 관리자인 경우 팀장만 조회
+      const [teamLeadersRes, salesManagersRes] = await Promise.all([
+        fetch("/api/members?role=team_leader&is_active=true"),
+        currentRole === "system_admin"
+          ? fetch("/api/members?role=sales_manager&is_active=true")
+          : Promise.resolve(null),
+      ]);
+
+      const teamLeadersResult = await teamLeadersRes.json();
+      const teamLeaders = teamLeadersResult.data || [];
+
+      let allMembers = [...teamLeaders];
+
+      // 시스템 관리자인 경우 영업 관리자도 추가
+      if (salesManagersRes) {
+        const salesManagersResult = await salesManagersRes.json();
+        const salesManagers = salesManagersResult.data || [];
+        allMembers = [...salesManagers, ...teamLeaders]; // 영업 관리자를 앞에 배치
       }
+
+      setMembers(allMembers);
     } catch (error) {
       console.error("Members fetch error:", error);
     }
-  }, []);
+  }, [currentRole]);
 
   // Fetch products
   const fetchProducts = useCallback(async () => {
@@ -208,6 +272,31 @@ export default function MemberPerformancePage() {
       }
     } catch (error) {
       console.error("Products fetch error:", error);
+    }
+  }, []);
+
+  // Fetch assigned leads for a member
+  const fetchAssignedLeads = useCallback(async (memberId: string) => {
+    try {
+      setLoadingLeads(true);
+      const response = await fetch(`/api/leads?memberId=${memberId}&limit=100`);
+      const result = await response.json();
+      if (result.data?.leads) {
+        setAssignedLeads(
+          result.data.leads.map((lead: { id: string; company_name: string | null; representative_name: string | null }) => ({
+            id: lead.id,
+            company_name: lead.company_name,
+            representative_name: lead.representative_name,
+          }))
+        );
+      } else {
+        setAssignedLeads([]);
+      }
+    } catch (error) {
+      console.error("Assigned leads fetch error:", error);
+      setAssignedLeads([]);
+    } finally {
+      setLoadingLeads(false);
     }
   }, []);
 
@@ -292,6 +381,9 @@ export default function MemberPerformancePage() {
       setEditingDetails([createEmptyDetail()]);
     }
 
+    // Fetch assigned leads for this member
+    fetchAssignedLeads(member.id);
+    setOpenClientPopover(null);
     setDialogOpen(true);
   };
 
@@ -302,9 +394,7 @@ export default function MemberPerformancePage() {
 
   // Remove detail row
   const removeDetailRow = (index: number) => {
-    if (editingDetails.length > 1) {
-      setEditingDetails(editingDetails.filter((_, i) => i !== index));
-    }
+    setEditingDetails(editingDetails.filter((_, i) => i !== index));
   };
 
   // Update detail row
@@ -604,10 +694,10 @@ export default function MemberPerformancePage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Receipt className="h-5 w-5" />
-                  팀장별 실적
+                  {canEdit ? "멤버별 실적" : "팀장별 실적"}
                 </CardTitle>
                 <CardDescription>
-                  {canEdit ? "팀장을 클릭하여 실적을 입력하세요" : "담당 팀원들의 실적을 조회합니다"}
+                  {canEdit ? "멤버를 클릭하여 실적을 입력하세요" : "담당 팀원들의 실적을 조회합니다"}
                 </CardDescription>
               </div>
               <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
@@ -616,12 +706,31 @@ export default function MemberPerformancePage() {
                   <SelectValue placeholder="팀 필터" />
                 </SelectTrigger>
                 <SelectContent>
+                  {/* 영업 관리자인 경우 담당 팀을 먼저 표시 */}
+                  {currentRole === "sales_manager" && managerTeams.length > 0 && (
+                    <>
+                      {managerTeams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name} (담당)
+                        </SelectItem>
+                      ))}
+                      <div className="h-px bg-border my-1" />
+                    </>
+                  )}
                   <SelectItem value="all">전체 팀</SelectItem>
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
+                  {/* 영업 관리자인 경우 담당 팀은 제외하고 나머지 팀 표시 */}
+                  {currentRole === "sales_manager"
+                    ? teams.filter(t => !managerTeams.some(mt => mt.id === t.id)).map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
+                      ))
+                    : teams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
+                      ))
+                  }
                 </SelectContent>
               </Select>
             </CardHeader>
@@ -633,13 +742,14 @@ export default function MemberPerformancePage() {
               ) : filteredMembers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
                   <Users className="h-8 w-8 mb-2" />
-                  <p>등록된 팀장이 없습니다</p>
+                  <p>{canEdit ? "등록된 멤버가 없습니다" : "등록된 팀장이 없습니다"}</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>팀장명</TableHead>
+                      <TableHead>{canEdit ? "멤버명" : "팀장명"}</TableHead>
+                      {canEdit && <TableHead>역할</TableHead>}
                       <TableHead>소속 팀</TableHead>
                       <TableHead className="text-right">계약 건수</TableHead>
                       <TableHead className="text-right">총 월납</TableHead>
@@ -660,6 +770,17 @@ export default function MemberPerformancePage() {
                           <TableCell className="font-medium">
                             {member.name}
                           </TableCell>
+                          {canEdit && (
+                            <TableCell>
+                              {member.role === "sales_manager" ? (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                  영업관리자
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">팀장</Badge>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell>
                             {member.team ? (
                               <div className="flex items-center gap-1">
@@ -776,17 +897,15 @@ export default function MemberPerformancePage() {
                               <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 ml-auto [[data-state=open]_&]:rotate-180" />
                             </div>
                           </CollapsibleTrigger>
-                          {editingDetails.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 ml-2"
-                              onClick={() => removeDetailRow(index)}
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                            </Button>
-                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 ml-2"
+                            onClick={() => removeDetailRow(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                          </Button>
                         </div>
                         <CollapsibleContent>
                           <div className="p-4 space-y-4 border-t bg-background">
@@ -825,14 +944,135 @@ export default function MemberPerformancePage() {
                             {/* 고객명 */}
                             <div className="space-y-2">
                               <Label>고객명</Label>
-                              <Input
-                                placeholder="고객명을 입력하세요"
-                                value={detail.client_name}
-                                onChange={(e) =>
-                                  updateDetailRow(index, "client_name", e.target.value)
+                              <Popover
+                                open={openClientPopover === index}
+                                onOpenChange={(open) =>
+                                  setOpenClientPopover(open ? index : null)
                                 }
-                                maxLength={200}
-                              />
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={openClientPopover === index}
+                                    className="w-full justify-between font-normal"
+                                  >
+                                    {detail.client_name || "고객 선택 또는 입력..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[350px] p-0" align="start">
+                                  <Command>
+                                    <CommandInput
+                                      placeholder="고객명 검색 또는 입력..."
+                                      onValueChange={(value) => {
+                                        // 검색어를 직접 입력값으로 설정할 수 있도록
+                                        if (value && !assignedLeads.some(
+                                          (lead) =>
+                                            (lead.company_name || lead.representative_name || "") === value
+                                        )) {
+                                          updateDetailRow(index, "client_name", value);
+                                        }
+                                      }}
+                                    />
+                                    <CommandList>
+                                      {loadingLeads ? (
+                                        <div className="py-6 text-center text-sm text-muted-foreground">
+                                          리드 불러오는 중...
+                                        </div>
+                                      ) : (
+                                        <>
+                                          {assignedLeads.length > 0 ? (
+                                            <CommandGroup heading="배분받은 리드">
+                                              {assignedLeads.map((lead) => {
+                                                const displayName =
+                                                  lead.company_name ||
+                                                  lead.representative_name ||
+                                                  "(이름 없음)";
+                                                const subText =
+                                                  lead.company_name && lead.representative_name
+                                                    ? lead.representative_name
+                                                    : null;
+                                                return (
+                                                  <CommandItem
+                                                    key={lead.id}
+                                                    value={displayName}
+                                                    onSelect={() => {
+                                                      updateDetailRow(index, "client_name", displayName);
+                                                      setOpenClientPopover(null);
+                                                    }}
+                                                  >
+                                                    <Check
+                                                      className={cn(
+                                                        "mr-2 h-4 w-4",
+                                                        detail.client_name === displayName
+                                                          ? "opacity-100"
+                                                          : "opacity-0"
+                                                      )}
+                                                    />
+                                                    <div className="flex flex-col">
+                                                      <span>{displayName}</span>
+                                                      {subText && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                          대표: {subText}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  </CommandItem>
+                                                );
+                                              })}
+                                            </CommandGroup>
+                                          ) : (
+                                            <div className="py-3 px-2 text-sm text-muted-foreground">
+                                              <div className="flex items-center gap-2">
+                                                <User className="h-4 w-4" />
+                                                <span>배분받은 리드가 없습니다</span>
+                                              </div>
+                                            </div>
+                                          )}
+                                          <CommandEmpty>
+                                            <div className="py-2 text-center">
+                                              <p className="text-sm text-muted-foreground mb-2">
+                                                검색 결과가 없습니다
+                                              </p>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                  setOpenClientPopover(null);
+                                                }}
+                                              >
+                                                직접 입력으로 사용
+                                              </Button>
+                                            </div>
+                                          </CommandEmpty>
+                                        </>
+                                      )}
+                                    </CommandList>
+                                  </Command>
+                                  {/* 직접 입력 필드 */}
+                                  <div className="border-t p-2">
+                                    <div className="flex gap-2">
+                                      <Input
+                                        placeholder="고객명 직접 입력"
+                                        value={detail.client_name}
+                                        onChange={(e) =>
+                                          updateDetailRow(index, "client_name", e.target.value)
+                                        }
+                                        maxLength={200}
+                                        className="flex-1"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => setOpenClientPopover(null)}
+                                      >
+                                        확인
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             </div>
 
                             {/* 월납 금액 & 수수료 */}

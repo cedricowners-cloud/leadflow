@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -166,15 +166,53 @@ export function BulkActionBar({
   }, [selectedGradeName, fetchEligibility]);
 
   // 팀별 멤버 그룹화 (자격 정보 없을 때 fallback)
-  const membersByTeam = members.reduce(
-    (acc, member) => {
+  // 팀명 1순위로 정렬된 배열 형태로 반환
+  const membersByTeamSorted = useMemo(() => {
+    // 1. 팀별로 그룹화
+    const teamMap: Record<string, Member[]> = {};
+    members.forEach((member) => {
       const teamName = member.team?.name || "미배정";
-      if (!acc[teamName]) acc[teamName] = [];
-      acc[teamName].push(member);
-      return acc;
-    },
-    {} as Record<string, Member[]>
-  );
+      if (!teamMap[teamName]) teamMap[teamName] = [];
+      teamMap[teamName].push(member);
+    });
+
+    // 2. 팀명으로 정렬된 배열로 변환
+    return Object.entries(teamMap)
+      .sort(([teamA], [teamB]) => {
+        // "미배정"은 맨 뒤로
+        if (teamA === "미배정") return 1;
+        if (teamB === "미배정") return -1;
+        return teamA.localeCompare(teamB, "ko");
+      })
+      .map(([teamName, teamMembers]) => ({
+        teamName,
+        members: teamMembers,
+      }));
+  }, [members]);
+
+  // 자격 정보가 있을 때 정렬된 데이터 생성
+  // 1순위: 자격자/비자격자, 2순위: 팀명, 3순위: 실적(월납) 내림차순
+  const sortedEligibilityData = eligibilityData ? {
+    ...eligibilityData,
+    eligibleMembers: eligibilityData.eligibleMembers
+      .slice()
+      .sort((a, b) => a.team.name.localeCompare(b.team.name, "ko"))
+      .map((teamGroup) => ({
+        ...teamGroup,
+        members: teamGroup.members.slice().sort((a, b) =>
+          b.performance.monthlyPayment - a.performance.monthlyPayment
+        ),
+      })),
+    ineligibleMembers: eligibilityData.ineligibleMembers
+      .slice()
+      .sort((a, b) => a.team.name.localeCompare(b.team.name, "ko"))
+      .map((teamGroup) => ({
+        ...teamGroup,
+        members: teamGroup.members.slice().sort((a, b) =>
+          b.performance.monthlyPayment - a.performance.monthlyPayment
+        ),
+      })),
+  } : null;
 
   // 일괄 배분
   const handleBulkAssign = async (memberId: string | null) => {
@@ -326,26 +364,26 @@ export function BulkActionBar({
             </SelectItem>
 
             {/* 자격 정보가 있는 경우: 자격자/비자격자로 그룹화 */}
-            {eligibilityData && selectedGradeName ? (
+            {sortedEligibilityData && selectedGradeName ? (
               <>
                 {/* 기준 월 표시 */}
                 <div className="px-2 py-2 text-xs text-center border-b bg-blue-50 text-blue-700">
                   <span className="font-medium">
-                    {eligibilityData.period.year}년 {eligibilityData.period.month}월 실적 기준
+                    {sortedEligibilityData.period.year}년 {sortedEligibilityData.period.month}월 실적 기준
                   </span>
-                  {eligibilityData.period.isCurrentMonth && (
+                  {sortedEligibilityData.period.isCurrentMonth && (
                     <span className="ml-1 text-blue-500">(현재 월)</span>
                   )}
                 </div>
 
                 {/* 자격자 그룹 */}
-                {eligibilityData.eligibleMembers.length > 0 && (
+                {sortedEligibilityData.eligibleMembers.length > 0 && (
                   <SelectGroup>
                     <SelectLabel className="flex items-center gap-2 text-green-600 bg-green-50">
                       <Check className="w-3 h-3" />
-                      {selectedGradeName}등급 자격자 ({eligibilityData.summary.eligibleCount}명)
+                      {selectedGradeName}등급 자격자 ({sortedEligibilityData.summary.eligibleCount}명)
                     </SelectLabel>
-                    {eligibilityData.eligibleMembers.map((teamGroup) => (
+                    {sortedEligibilityData.eligibleMembers.map((teamGroup) => (
                       <div key={teamGroup.team.id}>
                         <div className="px-2 py-1 text-xs text-muted-foreground bg-muted/30 pl-4">
                           {teamGroup.team.name}
@@ -371,13 +409,13 @@ export function BulkActionBar({
                 )}
 
                 {/* 비자격자 그룹 */}
-                {eligibilityData.ineligibleMembers.length > 0 && (
+                {sortedEligibilityData.ineligibleMembers.length > 0 && (
                   <SelectGroup>
                     <SelectLabel className="flex items-center gap-2 text-orange-600 bg-orange-50">
                       <CircleDashed className="w-3 h-3" />
-                      비자격자 ({eligibilityData.summary.ineligibleCount}명)
+                      비자격자 ({sortedEligibilityData.summary.ineligibleCount}명)
                     </SelectLabel>
-                    {eligibilityData.ineligibleMembers.map((teamGroup) => (
+                    {sortedEligibilityData.ineligibleMembers.map((teamGroup) => (
                       <div key={teamGroup.team.id}>
                         <div className="px-2 py-1 text-xs text-muted-foreground bg-muted/30 pl-4">
                           {teamGroup.team.name}
@@ -403,8 +441,8 @@ export function BulkActionBar({
                 )}
               </>
             ) : (
-              /* 자격 정보가 없는 경우: 기존 팀별 그룹화 */
-              Object.entries(membersByTeam).map(([teamName, teamMembers]) => (
+              /* 자격 정보가 없는 경우: 팀별 그룹화 (팀명 정렬) */
+              membersByTeamSorted.map(({ teamName, members: teamMembers }) => (
                 <div key={teamName}>
                   <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
                     {teamName}

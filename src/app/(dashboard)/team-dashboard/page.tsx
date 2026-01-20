@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Header } from "@/components/layout/header";
 import {
   Card,
@@ -28,9 +28,11 @@ import {
   Clock,
   RefreshCw,
   ChevronRight,
+  Radio,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface TeamMemberStats {
   id: string;
@@ -72,6 +74,10 @@ export default function TeamDashboardPage() {
     avgMeetingRate: 0,
     avgContractRate: 0,
   });
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const memberIdsRef = useRef<string[]>([]);
 
   const fetchTeamData = useCallback(async () => {
     setLoading(true);
@@ -150,6 +156,7 @@ export default function TeamDashboardPage() {
 
       // 각 팀원별 리드 통계 조회
       const memberIds = teamMembers.map((m) => m.id);
+      memberIdsRef.current = memberIds; // 실시간 구독을 위해 저장
       const today = new Date().toISOString().split("T")[0];
 
       // 전체 리드 조회
@@ -244,6 +251,8 @@ export default function TeamDashboardPage() {
         avgContractRate:
           totalMeetings > 0 ? (totalContracts / totalMeetings) * 100 : 0,
       });
+
+      setLastUpdated(new Date());
     } catch (error) {
       console.error("Error fetching team data:", error);
       toast.error("팀 데이터를 불러오는데 실패했습니다");
@@ -252,9 +261,71 @@ export default function TeamDashboardPage() {
     }
   }, []);
 
+  // 초기 데이터 로드
   useEffect(() => {
     fetchTeamData();
   }, [fetchTeamData]);
+
+  // Supabase 실시간 구독 설정
+  useEffect(() => {
+    const supabase = createClient();
+
+    // leads 테이블 변경 감지 채널 생성
+    const channel = supabase
+      .channel("team-dashboard-leads-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // INSERT, UPDATE, DELETE 모두 감지
+          schema: "public",
+          table: "leads",
+        },
+        (payload) => {
+          // 팀원의 리드 변경인지 확인
+          const newRecord = payload.new as { assigned_member_id?: string } | null;
+          const oldRecord = payload.old as { assigned_member_id?: string } | null;
+
+          const affectedMemberId =
+            newRecord?.assigned_member_id || oldRecord?.assigned_member_id;
+
+          // 현재 팀의 팀원 리드인 경우에만 새로고침
+          if (affectedMemberId && memberIdsRef.current.includes(affectedMemberId)) {
+            console.log("팀 리드 변경 감지, 데이터 새로고침...", payload.eventType);
+            fetchTeamData();
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          setIsRealtimeConnected(true);
+          console.log("팀 대시보드 실시간 구독 연결됨");
+        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
+          setIsRealtimeConnected(false);
+          console.log("팀 대시보드 실시간 구독 연결 해제됨");
+        }
+      });
+
+    channelRef.current = channel;
+
+    // 컴포넌트 언마운트 시 구독 해제
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+        setIsRealtimeConnected(false);
+      }
+    };
+  }, [fetchTeamData]);
+
+  // 마지막 업데이트 시간 포맷
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return "";
+    return date.toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
 
   return (
     <>
@@ -263,6 +334,39 @@ export default function TeamDashboardPage() {
         description="팀원들의 리드 현황과 성과를 확인하세요."
       />
       <div className="flex flex-1 flex-col gap-4 p-4">
+        {/* 실시간 상태 표시 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {isRealtimeConnected ? (
+              <Badge variant="outline" className="text-green-600 border-green-600">
+                <Radio className="h-3 w-3 mr-1 animate-pulse" />
+                실시간 연결됨
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-muted-foreground">
+                <Radio className="h-3 w-3 mr-1" />
+                연결 대기중
+              </Badge>
+            )}
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                마지막 업데이트: {formatLastUpdated(lastUpdated)}
+              </span>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchTeamData}
+            disabled={loading}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            />
+            새로고침
+          </Button>
+        </div>
+
         {/* 팀 요약 카드 */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -322,25 +426,10 @@ export default function TeamDashboardPage() {
         {/* 팀원별 현황 */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>팀원별 현황</CardTitle>
-                <CardDescription>
-                  각 팀원의 리드 처리 현황과 성과를 확인하세요
-                </CardDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchTeamData}
-                disabled={loading}
-              >
-                <RefreshCw
-                  className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                />
-                새로고침
-              </Button>
-            </div>
+            <CardTitle>팀원별 현황</CardTitle>
+            <CardDescription>
+              각 팀원의 리드 처리 현황과 성과를 확인하세요
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (

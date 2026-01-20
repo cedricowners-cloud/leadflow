@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 // 멤버 생성 스키마
@@ -11,7 +12,7 @@ const createMemberSchema = z.object({
     message: "올바른 역할을 선택해주세요",
   }),
   team_id: z.string().uuid().optional().nullable(),
-  password: z.string().min(8, "비밀번호는 8자 이상이어야 합니다"),
+  password: z.string().min(4, "비밀번호는 4자 이상이어야 합니다"),
 });
 
 // GET /api/members - 멤버 목록 조회
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
         team:teams(id, name)
       `
       )
-      .order("name");
+      .order("created_at", { ascending: true });
 
     // 필터 적용
     if (role) {
@@ -175,9 +176,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Supabase Auth 사용자 생성
+    // Admin 클라이언트 생성 (service_role key 필요)
+    const adminClient = createAdminClient();
+
+    // Supabase Auth 사용자 생성 (admin 클라이언트 사용)
     const { data: authData, error: authError } =
-      await supabase.auth.admin.createUser({
+      await adminClient.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
@@ -186,13 +190,13 @@ export async function POST(request: NextRequest) {
     if (authError) {
       console.error("Auth user create error:", authError);
       return NextResponse.json(
-        { error: "사용자 계정 생성에 실패했습니다" },
+        { error: "사용자 계정 생성에 실패했습니다: " + authError.message },
         { status: 500 }
       );
     }
 
-    // 멤버 정보 저장
-    const { data: member, error: memberError } = await supabase
+    // 멤버 정보 저장 (admin 클라이언트로 RLS 우회)
+    const { data: member, error: memberError } = await adminClient
       .from("members")
       .insert({
         user_id: authData.user.id,
@@ -201,6 +205,7 @@ export async function POST(request: NextRequest) {
         phone,
         role,
         team_id: team_id || null,
+        must_change_password: true, // 최초 로그인 시 비밀번호 변경 필요
       })
       .select(
         `
@@ -212,9 +217,25 @@ export async function POST(request: NextRequest) {
 
     if (memberError) {
       // 멤버 생성 실패 시 Auth 사용자 삭제
-      await supabase.auth.admin.deleteUser(authData.user.id);
+      await adminClient.auth.admin.deleteUser(authData.user.id);
       console.error("Member create error:", memberError);
       return NextResponse.json({ error: memberError.message }, { status: 500 });
+    }
+
+    // 영업 관리자(sales_manager)인 경우 manager_teams 테이블에도 추가
+    if (role === "sales_manager" && team_id) {
+      const { error: managerTeamError } = await adminClient
+        .from("manager_teams")
+        .insert({
+          member_id: member.id,
+          team_id: team_id,
+        });
+
+      if (managerTeamError) {
+        console.error("Manager teams insert error:", managerTeamError);
+        // manager_teams 추가 실패 시에도 멤버 생성은 성공으로 처리
+        // 추후 수정을 통해 팀 할당 가능
+      }
     }
 
     return NextResponse.json({ data: member }, { status: 201 });

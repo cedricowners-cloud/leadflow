@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, UserCog, Users, Mail, Phone } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Plus, Pencil, Trash2, UserCog, Users, Phone, Shield, Briefcase, User } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,26 +51,71 @@ import { toast } from "sonner";
 import type { Member, Team } from "@/types/database.types";
 import { roleLabels, roleColors, type MemberRole } from "@/lib/constants/roles";
 
+// 역할별 그룹 정보
+const roleGroups: {
+  role: MemberRole;
+  label: string;
+  icon: React.ElementType;
+  description: string;
+}[] = [
+  {
+    role: "system_admin",
+    label: "시스템 관리자",
+    icon: Shield,
+    description: "시스템 전체 관리 권한을 가진 관리자입니다.",
+  },
+  {
+    role: "sales_manager",
+    label: "영업 관리자",
+    icon: Briefcase,
+    description: "소속 팀의 리드와 멤버를 관리하는 매니저입니다.",
+  },
+  {
+    role: "team_leader",
+    label: "팀장",
+    icon: User,
+    description: "배분된 리드를 담당하는 팀장입니다.",
+  },
+];
+
 interface MemberWithTeam extends Member {
   team: { id: string; name: string } | null;
 }
 
 interface FormData {
   name: string;
-  email: string;
+  loginId: string;
   phone: string;
   role: MemberRole;
   team_id: string;
-  password: string;
 }
+
+const EMAIL_DOMAIN = "@leadflow.com";
 
 const initialFormData: FormData = {
   name: "",
-  email: "",
+  loginId: "",
   phone: "",
   role: "team_leader",
   team_id: "",
-  password: "",
+};
+
+// 전화번호 포맷팅 함수 (숫자만 추출 후 하이픈 자동 생성)
+const formatPhoneNumber = (value: string): string => {
+  // 숫자만 추출
+  const numbers = value.replace(/[^0-9]/g, "");
+
+  // 최대 11자리까지만 허용
+  const limited = numbers.slice(0, 11);
+
+  // 하이픈 자동 추가
+  if (limited.length <= 3) {
+    return limited;
+  } else if (limited.length <= 7) {
+    return `${limited.slice(0, 3)}-${limited.slice(3)}`;
+  } else {
+    return `${limited.slice(0, 3)}-${limited.slice(3, 7)}-${limited.slice(7)}`;
+  }
 };
 
 export default function MembersPage() {
@@ -87,6 +132,40 @@ export default function MembersPage() {
   );
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [submitting, setSubmitting] = useState(false);
+
+  // 역할별로 멤버 그룹화 (팀명 1순위, created_at 2순위로 정렬)
+  const groupedMembers = useMemo(() => {
+    const groups: Record<MemberRole, MemberWithTeam[]> = {
+      system_admin: [],
+      sales_manager: [],
+      team_leader: [],
+    };
+
+    members.forEach((member) => {
+      const role = member.role as MemberRole;
+      if (groups[role]) {
+        groups[role].push(member);
+      }
+    });
+
+    // 각 그룹 내에서 팀명 1순위, created_at 2순위로 정렬
+    Object.keys(groups).forEach((role) => {
+      groups[role as MemberRole].sort((a, b) => {
+        // 팀명 비교 (null인 경우 맨 뒤로)
+        const teamA = a.team?.name || "zzz";
+        const teamB = b.team?.name || "zzz";
+        if (teamA !== teamB) {
+          return teamA.localeCompare(teamB, "ko");
+        }
+        // 팀명이 같으면 created_at으로 정렬 (오름차순)
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateA - dateB;
+      });
+    });
+
+    return groups;
+  }, [members]);
 
   // 멤버 목록 조회
   const fetchMembers = async () => {
@@ -132,13 +211,14 @@ export default function MembersPage() {
   const openDialog = (member?: MemberWithTeam) => {
     if (member) {
       setEditingMember(member);
+      // 이메일에서 아이디 부분만 추출 (@앞 부분)
+      const loginId = member.email.split("@")[0] || "";
       setFormData({
         name: member.name,
-        email: member.email,
+        loginId,
         phone: member.phone || "",
         role: member.role as MemberRole,
         team_id: member.team_id || "",
-        password: "",
       });
     } else {
       setEditingMember(null);
@@ -152,24 +232,31 @@ export default function MembersPage() {
     e.preventDefault();
     setSubmitting(true);
 
+    // 아이디 + @leadflow.com 도메인으로 이메일 생성
+    const fullEmail = `${formData.loginId}${EMAIL_DOMAIN}`;
+
     try {
       const url = editingMember
         ? `/api/members/${editingMember.id}`
         : "/api/members";
       const method = editingMember ? "PATCH" : "POST";
 
-      // 수정 시 빈 패스워드 필드는 제외
+      // 수정 시 비밀번호 필드 제외, 생성 시 기본 비밀번호 "1234" 사용
       const submitData = editingMember
         ? {
             name: formData.name,
-            email: formData.email,
+            email: fullEmail,
             phone: formData.phone || null,
             role: formData.role,
             team_id: formData.team_id || null,
           }
         : {
-            ...formData,
+            name: formData.name,
+            email: fullEmail,
+            phone: formData.phone || null,
+            role: formData.role,
             team_id: formData.team_id || null,
+            password: "1234",
           };
 
       const response = await fetch(url, {
@@ -271,73 +358,92 @@ export default function MembersPage() {
                 </Button>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>이름</TableHead>
-                    <TableHead>이메일</TableHead>
-                    <TableHead>연락처</TableHead>
-                    <TableHead>역할</TableHead>
-                    <TableHead>소속 팀</TableHead>
-                    <TableHead className="text-right">액션</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {members.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="font-medium">
-                        {member.name}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Mail className="h-3 w-3" />
-                          {member.email}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {member.phone ? (
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <Phone className="h-3 w-3" />
-                            {member.phone}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={
-                            roleColors[member.role as MemberRole] || ""
-                          }
-                        >
-                          {roleLabels[member.role as MemberRole] || member.role}
+              <div className="space-y-6">
+                {roleGroups.map((group) => {
+                  const groupMembers = groupedMembers[group.role];
+                  const Icon = group.icon;
+
+                  return (
+                    <div key={group.role} className="space-y-3">
+                      {/* 그룹 헤더 */}
+                      <div className="flex items-center gap-2 pb-2 border-b">
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="font-medium">{group.label}</h3>
+                        <Badge variant="secondary" className="ml-1">
+                          {groupMembers.length}명
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {member.team?.name || "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openDialog(member)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openDeleteDialog(member)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          {group.description}
+                        </span>
+                      </div>
+
+                      {/* 그룹 멤버 목록 */}
+                      {groupMembers.length === 0 ? (
+                        <div className="text-sm text-muted-foreground py-4 text-center bg-muted/30 rounded-md">
+                          등록된 {group.label}가 없습니다
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>이름</TableHead>
+                              <TableHead>아이디</TableHead>
+                              <TableHead>연락처</TableHead>
+                              <TableHead>소속 팀</TableHead>
+                              <TableHead className="text-right">액션</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {groupMembers.map((member) => (
+                              <TableRow key={member.id}>
+                                <TableCell className="font-medium">
+                                  {member.name}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="text-muted-foreground">
+                                    {member.email.split("@")[0]}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {member.phone ? (
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                      <Phone className="h-3 w-3" />
+                                      {member.phone}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {member.team?.name || "-"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openDialog(member)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openDeleteDialog(member)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -371,22 +477,17 @@ export default function MembersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">이메일</Label>
+                <Label htmlFor="loginId">아이디 (로그인 ID)</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="example@company.com"
-                  value={formData.email}
+                  id="loginId"
+                  type="text"
+                  placeholder="아이디 입력"
+                  value={formData.loginId}
                   onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
+                    setFormData({ ...formData, loginId: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "") })
                   }
                   required
                 />
-                {editingMember && (
-                  <p className="text-xs text-muted-foreground">
-                    이메일 변경 시 로그인 ID도 함께 변경됩니다
-                  </p>
-                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">연락처</Label>
@@ -396,7 +497,7 @@ export default function MembersPage() {
                   placeholder="010-1234-5678"
                   value={formData.phone}
                   onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
+                    setFormData({ ...formData, phone: formatPhoneNumber(e.target.value) })
                   }
                 />
               </div>
@@ -445,20 +546,9 @@ export default function MembersPage() {
                 )}
               </div>
               {!editingMember && (
-                <div className="space-y-2">
-                  <Label htmlFor="password">비밀번호</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="8자 이상 입력"
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    required={!editingMember}
-                    minLength={8}
-                  />
-                </div>
+                <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                  초기 비밀번호는 &quot;1234&quot;로 자동 생성됩니다. 첫 로그인 시 변경하세요.
+                </p>
               )}
             </div>
             <DialogFooter>

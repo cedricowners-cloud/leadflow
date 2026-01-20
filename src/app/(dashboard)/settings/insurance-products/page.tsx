@@ -84,8 +84,11 @@ export default function InsuranceProductsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<InsuranceProduct | null>(null);
-  const [deletingProduct, setDeletingProduct] = useState<InsuranceProduct | null>(null);
+  const [editingProduct, setEditingProduct] = useState<InsuranceProduct | null>(
+    null
+  );
+  const [deletingProduct, setDeletingProduct] =
+    useState<InsuranceProduct | null>(null);
   const [formData, setFormData] = useState<ProductFormData>(initialFormData);
   const [submitting, setSubmitting] = useState(false);
 
@@ -159,7 +162,9 @@ export default function InsuranceProductsPage() {
       }
 
       toast.success(
-        editingProduct ? "보험 상품이 수정되었습니다" : "보험 상품이 등록되었습니다"
+        editingProduct
+          ? "보험 상품이 수정되었습니다"
+          : "보험 상품이 등록되었습니다"
       );
       setDialogOpen(false);
       fetchProducts();
@@ -177,9 +182,12 @@ export default function InsuranceProductsPage() {
     setSubmitting(true);
 
     try {
-      const response = await fetch(`/api/insurance-products/${deletingProduct.id}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/api/insurance-products/${deletingProduct.id}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       const result = await response.json();
 
@@ -222,8 +230,8 @@ export default function InsuranceProductsPage() {
                 보험 상품 목록
               </CardTitle>
               <CardDescription>
-                실적 입력 시 사용되는 보험 상품과 수수료율을 관리합니다.
-                월납 금액 입력 시 수수료가 자동 계산됩니다.
+                실적 입력 시 사용되는 보험 상품과 수수료율을 관리합니다. 월납
+                금액 입력 시 수수료가 자동 계산됩니다.
               </CardDescription>
             </div>
             <Button onClick={() => openDialog()}>
@@ -254,9 +262,11 @@ export default function InsuranceProductsPage() {
                   <TableRow>
                     <TableHead>상품명</TableHead>
                     <TableHead>보험사</TableHead>
-                    <TableHead className="text-right">보험사 수수료율</TableHead>
+                    <TableHead className="text-right">
+                      보험사 수수료율
+                    </TableHead>
                     <TableHead className="text-right">조정률</TableHead>
-                    <TableHead className="text-right">실효 수수료율</TableHead>
+                    <TableHead className="text-right">CMP</TableHead>
                     <TableHead>설명</TableHead>
                     <TableHead className="text-right">액션</TableHead>
                   </TableRow>
@@ -279,7 +289,9 @@ export default function InsuranceProductsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <span className="font-medium text-blue-600">
-                          {formatCommissionRate(product.insurer_commission_rate)}
+                          {formatCommissionRate(
+                            product.insurer_commission_rate
+                          )}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -291,7 +303,12 @@ export default function InsuranceProductsPage() {
                         <div className="flex items-center justify-end gap-1">
                           <Percent className="h-3 w-3 text-muted-foreground" />
                           <span className="font-medium text-primary">
-                            {formatCommissionRate(getEffectiveRate(product.insurer_commission_rate, product.adjustment_rate))}
+                            {formatCommissionRate(
+                              getEffectiveRate(
+                                product.insurer_commission_rate,
+                                product.adjustment_rate
+                              )
+                            )}
                           </span>
                         </div>
                       </TableCell>
@@ -340,19 +357,39 @@ export default function InsuranceProductsPage() {
               <div>
                 <p className="font-medium text-foreground mb-1">계산 공식</p>
                 <p className="bg-muted p-2 rounded font-mono text-xs">
-                  수수료 = 월납 금액 × <span className="text-blue-600">보험사 수수료율</span> × <span className="text-orange-600">회사 조정률</span>
+                  수수료 = 월납 금액 ×{" "}
+                  <span className="text-blue-600">보험사 수수료율</span> ×{" "}
+                  <span className="text-orange-600">회사 조정률</span>
                 </p>
               </div>
               <div className="bg-muted p-3 rounded-lg space-y-2">
                 <p className="font-medium text-foreground">예시</p>
                 <div className="space-y-1">
-                  <p>• 월납 100만원 × <span className="text-blue-600">150%</span> × <span className="text-orange-600">100%</span> = <span className="font-medium text-foreground">1,500,000원</span></p>
-                  <p>• 월납 50만원 × <span className="text-blue-600">120%</span> × <span className="text-orange-600">80%</span> = <span className="font-medium text-foreground">480,000원</span></p>
+                  <p>
+                    • 월납 100만원 × <span className="text-blue-600">150%</span>{" "}
+                    × <span className="text-orange-600">100%</span> ={" "}
+                    <span className="font-medium text-foreground">
+                      1,500,000원
+                    </span>
+                  </p>
+                  <p>
+                    • 월납 50만원 × <span className="text-blue-600">120%</span>{" "}
+                    × <span className="text-orange-600">80%</span> ={" "}
+                    <span className="font-medium text-foreground">
+                      480,000원
+                    </span>
+                  </p>
                 </div>
               </div>
               <div className="text-xs">
-                <p><span className="text-blue-600">● 보험사 수수료율</span>: 보험사에서 제공하는 수수료 환산율</p>
-                <p><span className="text-orange-600">● 회사 조정률</span>: 급여 계산 시 적용하는 회사 조정률</p>
+                <p>
+                  <span className="text-blue-600">● 보험사 수수료율</span>:
+                  보험사에서 제공하는 수수료 환산율
+                </p>
+                <p>
+                  <span className="text-orange-600">● 회사 조정률</span>: 급여
+                  계산 시 적용하는 회사 조정률
+                </p>
               </div>
             </div>
           </CardContent>
@@ -404,7 +441,8 @@ export default function InsuranceProductsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="insurer_commission_rate">
-                    보험사 수수료율 (%) <span className="text-destructive">*</span>
+                    보험사 수수료율 (%){" "}
+                    <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
                     <Input
@@ -418,7 +456,8 @@ export default function InsuranceProductsPage() {
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          insurer_commission_rate: parseFloat(e.target.value) || 0,
+                          insurer_commission_rate:
+                            parseFloat(e.target.value) || 0,
                         })
                       }
                       required
@@ -463,22 +502,33 @@ export default function InsuranceProductsPage() {
                   </p>
                 </div>
               </div>
-              {formData.insurer_commission_rate > 0 && formData.adjustment_rate > 0 && (
-                <div className="bg-muted p-3 rounded-lg text-sm">
-                  <p className="text-muted-foreground">
-                    실효 수수료율:{" "}
-                    <span className="font-medium text-foreground">
-                      {((formData.insurer_commission_rate * formData.adjustment_rate) / 100).toFixed(0)}%
-                    </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    월납 100만원 기준 수수료:{" "}
-                    <span className="font-medium text-foreground">
-                      {(1000000 * (formData.insurer_commission_rate / 100) * (formData.adjustment_rate / 100)).toLocaleString()}원
-                    </span>
-                  </p>
-                </div>
-              )}
+              {formData.insurer_commission_rate > 0 &&
+                formData.adjustment_rate > 0 && (
+                  <div className="bg-muted p-3 rounded-lg text-sm">
+                    <p className="text-muted-foreground">
+                      실효 수수료율:{" "}
+                      <span className="font-medium text-foreground">
+                        {(
+                          (formData.insurer_commission_rate *
+                            formData.adjustment_rate) /
+                          100
+                        ).toFixed(0)}
+                        %
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      월납 100만원 기준 수수료:{" "}
+                      <span className="font-medium text-foreground">
+                        {(
+                          1000000 *
+                          (formData.insurer_commission_rate / 100) *
+                          (formData.adjustment_rate / 100)
+                        ).toLocaleString()}
+                        원
+                      </span>
+                    </p>
+                  </div>
+                )}
               <div className="space-y-2">
                 <Label htmlFor="description">설명</Label>
                 <Textarea
@@ -515,8 +565,9 @@ export default function InsuranceProductsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>보험 상품 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              정말로 &quot;{deletingProduct?.name}&quot; 상품을 삭제하시겠습니까?
-              해당 상품을 사용하는 실적이 있으면 삭제할 수 없습니다.
+              정말로 &quot;{deletingProduct?.name}&quot; 상품을
+              삭제하시겠습니까? 해당 상품을 사용하는 실적이 있으면 삭제할 수
+              없습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -3,8 +3,40 @@ import { createClient } from "@/lib/supabase/server";
 import {
   evaluateQuickEligibility,
   formatPaymentAmount,
+  EligibilityThresholds,
 } from "@/lib/utils/distribution-eligibility";
 import { getPreviousMonth } from "@/lib/utils/commission-calculator";
+
+// 시스템 설정에서 배분 기준값 조회
+async function getDistributionThresholds(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<EligibilityThresholds> {
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", "distribution_eligibility_thresholds")
+    .single();
+
+  if (data?.value) {
+    const thresholds = data.value as {
+      grade_a_min_payment?: number;
+      grade_b_min_payment?: number;
+      grade_b_max_payment?: number;
+    };
+    return {
+      grade_a_min_payment: thresholds.grade_a_min_payment ?? 600000,
+      grade_b_min_payment: thresholds.grade_b_min_payment ?? 200000,
+      grade_b_max_payment: thresholds.grade_b_max_payment ?? 600000,
+    };
+  }
+
+  // 기본값 반환
+  return {
+    grade_a_min_payment: 600000,
+    grade_b_min_payment: 200000,
+    grade_b_max_payment: 600000,
+  };
+}
 
 // GET: 등급별 자격자 목록 조회
 export async function GET(request: NextRequest) {
@@ -26,6 +58,9 @@ export async function GET(request: NextRequest) {
     const gradeName = searchParams.get("gradeName");
     const teamId = searchParams.get("teamId");
     const useCurrentMonth = searchParams.get("useCurrentMonth") === "true";
+
+    // 배분 기준값 조회 (DB에서)
+    const thresholds = await getDistributionThresholds(supabase);
 
     // 등급 정보 조회
     let grade = null;
@@ -117,10 +152,11 @@ export async function GET(request: NextRequest) {
         const monthlyPayment = performance?.total_monthly_payment || 0;
         const isNewbieTestPassed = qualification?.newbie_test_passed || false;
 
-        // 빠른 자격 평가
+        // 빠른 자격 평가 (DB에서 조회한 기준값 사용)
         const eligibility = evaluateQuickEligibility(
           monthlyPayment,
-          isNewbieTestPassed
+          isNewbieTestPassed,
+          thresholds
         );
 
         // 해당 등급 자격 여부
@@ -133,7 +169,7 @@ export async function GET(request: NextRequest) {
               isEligibleForGrade = eligibility.gradeA;
               eligibilityReason = isEligibleForGrade
                 ? `월납 ${formatPaymentAmount(monthlyPayment)}`
-                : `월납 ${formatPaymentAmount(monthlyPayment)} (60만원 미만)`;
+                : `월납 ${formatPaymentAmount(monthlyPayment)} (${formatPaymentAmount(thresholds.grade_a_min_payment)} 미만)`;
               break;
             case "B":
               isEligibleForGrade = eligibility.gradeB;
@@ -141,7 +177,7 @@ export async function GET(request: NextRequest) {
                 ? `월납 ${formatPaymentAmount(monthlyPayment)}`
                 : eligibility.gradeA
                   ? `A등급 자격자 (월납 ${formatPaymentAmount(monthlyPayment)})`
-                  : `월납 ${formatPaymentAmount(monthlyPayment)} (20만원 미만)`;
+                  : `월납 ${formatPaymentAmount(monthlyPayment)} (${formatPaymentAmount(thresholds.grade_b_min_payment)} 미만)`;
               break;
             case "C":
               isEligibleForGrade = eligibility.gradeC;
@@ -197,7 +233,7 @@ export async function GET(request: NextRequest) {
       (m) => !m.isEligibleForGrade
     );
 
-    // 팀별 그룹핑
+    // 팀별 그룹핑 (팀명 정렬)
     const groupByTeam = (members: typeof memberEligibilities) => {
       const grouped: Record<
         string,
@@ -223,7 +259,12 @@ export async function GET(request: NextRequest) {
         grouped[teamId].members.push(m);
       });
 
-      return Object.values(grouped);
+      // 팀명으로 정렬하여 반환 (팀 미배정은 맨 뒤로)
+      return Object.values(grouped).sort((a, b) => {
+        if (a.team.name === "팀 미배정") return 1;
+        if (b.team.name === "팀 미배정") return -1;
+        return a.team.name.localeCompare(b.team.name, "ko");
+      });
     };
 
     return NextResponse.json({

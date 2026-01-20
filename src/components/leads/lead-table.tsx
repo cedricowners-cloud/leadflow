@@ -272,16 +272,29 @@ export function LeadTable({
     }
   };
 
-  // 팀별 멤버 그룹화
-  const membersByTeam = members.reduce(
-    (acc, member) => {
+  // 팀별 멤버 그룹화 (팀명 정렬)
+  const membersByTeamSorted = useMemo(() => {
+    // 1. 팀별로 그룹화
+    const teamMap: Record<string, Member[]> = {};
+    members.forEach((member) => {
       const teamName = member.team?.name || "미배정";
-      if (!acc[teamName]) acc[teamName] = [];
-      acc[teamName].push(member);
-      return acc;
-    },
-    {} as Record<string, Member[]>
-  );
+      if (!teamMap[teamName]) teamMap[teamName] = [];
+      teamMap[teamName].push(member);
+    });
+
+    // 2. 팀명으로 정렬된 배열로 변환
+    return Object.entries(teamMap)
+      .sort(([teamA], [teamB]) => {
+        // "미배정"은 맨 뒤로
+        if (teamA === "미배정") return 1;
+        if (teamB === "미배정") return -1;
+        return teamA.localeCompare(teamB, "ko");
+      })
+      .map(([teamName, teamMembers]) => ({
+        teamName,
+        members: teamMembers,
+      }));
+  }, [members]);
 
   // 등급별 자격자 목록 로드 함수
   const fetchEligibility = useCallback(async (gradeName: string) => {
@@ -598,8 +611,8 @@ export function LeadTable({
                   자격 정보 로딩 중...
                 </div>
               ) : (
-                /* 등급이 없거나 자격 정보가 없는 경우: 기존 팀별 그룹화 */
-                Object.entries(membersByTeam).map(([teamName, teamMembers]) => (
+                /* 등급이 없거나 자격 정보가 없는 경우: 기존 팀별 그룹화 (팀명 정렬) */
+                membersByTeamSorted.map(({ teamName, members: teamMembers }) => (
                   <div key={teamName}>
                     <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
                       {teamName}

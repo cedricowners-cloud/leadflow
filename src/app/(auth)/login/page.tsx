@@ -88,9 +88,9 @@ export default function LoginPage() {
             <Input
               id="loginId"
               type="text"
-              placeholder="admin"
+              placeholder="아이디 입력"
               value={loginId}
-              onChange={(e) => setLoginId(e.target.value)}
+              onChange={(e) => setLoginId(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))}
               required
             />
             <p className="text-xs text-muted-foreground">

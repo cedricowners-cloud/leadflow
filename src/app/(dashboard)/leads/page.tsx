@@ -21,6 +21,7 @@ import {
   ColumnSettingsDialog,
   ColumnSetting,
 } from "@/components/leads/column-settings-dialog";
+import { createClient } from "@/lib/supabase/client";
 
 interface PaginationInfo {
   page: number;
@@ -57,6 +58,30 @@ export default function LeadsPage() {
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [columnSettings, setColumnSettings] = useState<ColumnSetting[]>([]);
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
+
+  // 현재 사용자 role 조회
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: member } = await supabase
+            .from("members")
+            .select("role")
+            .eq("user_id", user.id)
+            .single();
+          if (member) {
+            setCurrentRole(member.role);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   // URL 파라미터로 컬럼 설정 다이얼로그 열기 상태 관리
   const isColumnSettingsOpen = searchParams.get("openColumnSettings") === "true";
@@ -234,12 +259,15 @@ export default function LeadsPage() {
             <Download className="mr-2 h-4 w-4" />
             내보내기
           </Button>
-          <Link href="/leads/upload">
-            <Button>
-              <Upload className="mr-2 h-4 w-4" />
-              업로드
-            </Button>
-          </Link>
+          {/* 시스템 관리자만 업로드 버튼 표시 */}
+          {currentRole === "system_admin" && (
+            <Link href="/leads/upload">
+              <Button>
+                <Upload className="mr-2 h-4 w-4" />
+                업로드
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* 리드 테이블 */}
