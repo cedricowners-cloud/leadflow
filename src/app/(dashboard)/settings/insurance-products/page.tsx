@@ -300,17 +300,14 @@ export default function InsuranceProductsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Percent className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium text-primary">
-                            {formatCommissionRate(
-                              getEffectiveRate(
-                                product.insurer_commission_rate,
-                                product.adjustment_rate
-                              )
-                            )}
-                          </span>
-                        </div>
+                        <span className="font-medium text-primary">
+                          {formatCommissionRate(
+                            getEffectiveRate(
+                              product.insurer_commission_rate,
+                              product.adjustment_rate
+                            )
+                          )}
+                        </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground max-w-[200px] truncate">
                         {product.description || "-"}

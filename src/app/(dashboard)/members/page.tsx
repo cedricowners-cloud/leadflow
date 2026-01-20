@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Pencil, Trash2, UserCog, Users, Phone, Shield, Briefcase, User } from "lucide-react";
+import { Plus, Pencil, Trash2, UserCog, Users, Phone, Shield, Briefcase, User, KeyRound } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,6 +128,10 @@ export default function MembersPage() {
     null
   );
   const [deletingMember, setDeletingMember] = useState<MemberWithTeam | null>(
+    null
+  );
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [resettingMember, setResettingMember] = useState<MemberWithTeam | null>(
     null
   );
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -320,6 +324,40 @@ export default function MembersPage() {
     setDeleteDialogOpen(true);
   };
 
+  // 비밀번호 초기화 다이얼로그 열기
+  const openResetPasswordDialog = (member: MemberWithTeam) => {
+    setResettingMember(member);
+    setResetPasswordDialogOpen(true);
+  };
+
+  // 비밀번호 초기화
+  const handleResetPassword = async () => {
+    if (!resettingMember) return;
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(`/api/members/${resettingMember.id}/reset-password`, {
+        method: "POST",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error);
+      }
+
+      toast.success(`${resettingMember.name}님의 비밀번호가 "1234"로 초기화되었습니다`);
+      setResetPasswordDialogOpen(false);
+      setResettingMember(null);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "비밀번호 초기화에 실패했습니다"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <>
       <Header title="멤버 관리" />
@@ -418,18 +456,28 @@ export default function MembersPage() {
                                   {member.team?.name || "-"}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-2">
+                                  <div className="flex items-center justify-end gap-1">
                                     <Button
                                       variant="ghost"
                                       size="icon"
                                       onClick={() => openDialog(member)}
+                                      title="정보 수정"
                                     >
                                       <Pencil className="h-4 w-4" />
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="icon"
+                                      onClick={() => openResetPasswordDialog(member)}
+                                      title="비밀번호 초기화"
+                                    >
+                                      <KeyRound className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
                                       onClick={() => openDeleteDialog(member)}
+                                      title="비활성화"
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
@@ -584,6 +632,28 @@ export default function MembersPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {submitting ? "처리 중..." : "비활성화"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 비밀번호 초기화 확인 다이얼로그 */}
+      <AlertDialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>비밀번호 초기화</AlertDialogTitle>
+            <AlertDialogDescription>
+              &quot;{resettingMember?.name}&quot;님의 비밀번호를 &quot;1234&quot;로 초기화하시겠습니까?
+              <br />
+              <span className="text-muted-foreground text-xs mt-2 block">
+                해당 멤버에게 새 비밀번호를 안내해주세요.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetPassword}>
+              {submitting ? "처리 중..." : "초기화"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
