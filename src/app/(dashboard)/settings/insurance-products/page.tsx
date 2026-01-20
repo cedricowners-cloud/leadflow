@@ -479,7 +479,7 @@ export default function InsuranceProductsPage() {
                       type="number"
                       step="1"
                       min="0"
-                      max="200"
+                      max="1000"
                       placeholder="예: 100"
                       value={formData.adjustment_rate || ""}
                       onChange={(e) =>
@@ -518,9 +518,8 @@ export default function InsuranceProductsPage() {
                       월납 100만원 기준 수수료:{" "}
                       <span className="font-medium text-foreground">
                         {Math.round(
-                          1000000 *
-                          (formData.insurer_commission_rate / 100) /
-                          (formData.adjustment_rate / 100)
+                          (1000000 * (formData.insurer_commission_rate / 100)) /
+                            (formData.adjustment_rate / 100)
                         ).toLocaleString()}
                         원
                       </span>

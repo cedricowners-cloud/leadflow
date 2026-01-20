@@ -13,7 +13,7 @@ const createProductSchema = z.object({
   adjustment_rate: z
     .number()
     .min(0, "회사 조정률은 0 이상이어야 합니다")
-    .max(2, "회사 조정률은 200% 이하여야 합니다")
+    .max(10, "회사 조정률은 1000% 이하여야 합니다")
     .default(1.0), // 예: 1.0 = 100%
   description: z.string().max(500).nullish(), // null, undefined 모두 허용
 });
@@ -79,10 +79,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!member || member.role !== "system_admin") {
-      return NextResponse.json(
-        { error: "권한이 없습니다" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     // 요청 데이터 파싱 및 검증
@@ -99,8 +96,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, company, insurer_commission_rate, adjustment_rate, description } =
-      validationResult.data;
+    const {
+      name,
+      company,
+      insurer_commission_rate,
+      adjustment_rate,
+      description,
+    } = validationResult.data;
 
     // 상품명 중복 체크 (같은 회사 내에서)
     const duplicateQuery = supabase
