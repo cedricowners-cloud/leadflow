@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+                      <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+                       xmlns:x="urn:schemas-microsoft-com:office:excel"
+                       xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+                       xmlns:html="http://www.w3.org/TR/REC-html40">
+                      <Styles>
+                        <Style ss:ID="s17">
+                          <NumberFormat ss:Format="m/d/yy"/>
+                          <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s18">
+                          <NumberFormat ss:Format="m/d/yy"/>
+                          <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s19">
+                          <NumberFormat ss:Format="m/yy"/>
+                          <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s20">
+                          <NumberFormat ss:Format="m/yy"/>
+                          <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s21">
+                          <NumberFormat ss:Format="m/d/yy h:mm AM/PM"/>
+                          <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s22">
+                          <NumberFormat ss:Format="m/d/yy h:mm AM/PM"/>
+                          <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s23">
+                         <Alignment ss:Horizontal="Right" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s24">
+                         <Alignment ss:Horizontal="Right" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s25">
+                         <Alignment ss:Horizontal="Left" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s26">
+                         <Alignment ss:Horizontal="Left" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s27">
+                         <NumberFormat ss:Format="0"/>
+                         <Alignment ss:Horizontal="Right" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s28">
+                         <NumberFormat ss:Format="0"/>
+                         <Alignment ss:Horizontal="Right" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s29">
+                         <NumberFormat ss:Format="_(&quot;$&quot;* #,##0.00_);_(&quot;$&quot;* (#,##0.00);_(&quot;$&quot;* &quot;-&quot;??_);_(@_)"/>
+                         <Alignment ss:Horizontal="Right" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s30">
+                         <NumberFormat ss:Format="_(&quot;$&quot;* #,##0.00_);_(&quot;$&quot;* (#,##0.00);_(&quot;$&quot;* &quot;-&quot;??_);_(@_)"/>
+                         <Alignment ss:Horizontal="Right" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s31">
+                         <NumberFormat ss:Format="Percent"/>
+                         <Alignment ss:Horizontal="Right" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s32">
+                         <NumberFormat ss:Format="Percent"/>
+                         <Alignment ss:Horizontal="Right" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s33">
+                         <NumberFormat ss:Format="YYYY-mm-dd"/>
+                         <Alignment ss:Horizontal="Left" ss:Vertical="Bottom"/>
+                        </Style>
+                        <Style ss:ID="s34">
+                         <Alignment ss:Horizontal="Left" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana" ss:Bold="1"/>
+                        </Style>
+                        <Style ss:ID="s35">
+                         <Alignment ss:Horizontal="Left" ss:Vertical="Bottom"/>
+                         <Font ss:FontName="Verdana"/>
+                        </Style>
+                        <Style ss:ID="s36">
+                         <Alignment ss:Horizontal="Left" ss:Vertical="Top" ss:WrapText="1"/>
+                         <Font ss:FontName="Verdana"/>
+                        </Style>
+                      </Styles>
+<Worksheet ss:Name="Sheet1">
+<Table>
+<Column ss:Index="1" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="2" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="3" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="4" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="5" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="6" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="7" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="8" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="9" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="10" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="11" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="12" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="13" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="14" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="15" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="16" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="17" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="18" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="19" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="20" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="21" ss:AutoFitWidth="0" ss:Width="150"/>
+<Column ss:Index="22" ss:AutoFitWidth="0" ss:Width="150"/>
+<Row>
+<Cell ss:StyleID="s24"><Data ss:Type="String">id</Data></Cell>
+<Cell ss:StyleID="s24"><Data ss:Type="String">created_time</Data></Cell>
+<Cell ss:StyleID="s24"><Data ss:Type="String">ad_id</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">ad_name</Data></Cell>
+<Cell ss:StyleID="s24"><Data ss:Type="String">adset_id</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">adset_name</Data></Cell>
+<Cell ss:StyleID="s24"><Data ss:Type="String">campaign_id</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">campaign_name</Data></Cell>
+<Cell ss:StyleID="s24"><Data ss:Type="String">form_id</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">form_name</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">is_organic</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">platform</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">세급_체납이_있습니까?_(70%완료)_[세금체납시_신청이_어렵습니다]</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">사업자를_선택해주세요_(80%완료)</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">업종을_선택해주세요_(80%완료)</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">2024년_연매출을_선택해주세요_(90%완료)</Data></Cell>
+<Cell ss:StyleID="s24"><Data ss:Type="String">회신받으실_번호를_작성해주세요_(95%완료)</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">회신받으실_시간대를_작성해주세요_(99%완료)</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">company_name</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">full_name</Data></Cell>
+<Cell ss:StyleID="s24"><Data ss:Type="String">phone_number</Data></Cell>
+<Cell ss:StyleID="s26"><Data ss:Type="String">lead_status</Data></Cell>
+</Row>
+
+<Row>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1818875048756747</Data></Cell>
+<Cell ss:StyleID="s17"><Data ss:Type="DateTime">2026-01-12T09:00:20.000</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120239369769360439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 12.12 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237759048730439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237759048710439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">25411648125139440</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[내부] new 정책자금</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">false</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">ig</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">아니요</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">법인사업자</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">서비스업</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">10억~30억_미만</Data></Cell>
+<Cell ss:StyleID="s27"><Data ss:Type="Number">01076656025</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">오후16시이후</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">존앤스미스</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">Wonha Jeong</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">+821076656025</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">complete</Data></Cell>
+</Row>
+
+<Row>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1540291900594414</Data></Cell>
+<Cell ss:StyleID="s17"><Data ss:Type="DateTime">2026-01-10T11:39:12.000</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120239369769360439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 12.12 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237759048730439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237759048710439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">25411648125139440</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[내부] new 정책자금</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">false</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">ig</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">아니요</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">개인사업자</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">제조업_</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1억_미만</Data></Cell>
+<Cell ss:StyleID="s27"><Data ss:Type="Number">01056617730</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">시간관계
+없음</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">거기분식</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">박유진</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">+821056617730</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">complete</Data></Cell>
+</Row>
+
+<Row>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1965542614310475</Data></Cell>
+<Cell ss:StyleID="s17"><Data ss:Type="DateTime">2026-01-09T22:19:09.000</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120239369769360439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 12.12 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237759048730439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237759048710439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">25411648125139440</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[내부] new 정책자금</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">false</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">ig</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">아니요</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">개인사업자</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">서비스업</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1억~3억_미만</Data></Cell>
+<Cell ss:StyleID="s27"><Data ss:Type="Number">01081430368</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">오후 2시 이후</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">신지원</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">신지원</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">+821081430368</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">complete</Data></Cell>
+</Row>
+
+<Row>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1073363504916038</Data></Cell>
+<Cell ss:StyleID="s17"><Data ss:Type="DateTime">2026-01-09T09:58:35.000</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120239369769360439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 12.12 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237759048730439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237759048710439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_ins</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">25411648125139440</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[내부] new 정책자금</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">false</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">ig</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">아니요</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">개인사업자</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">서비스업</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1억_미만</Data></Cell>
+<Cell ss:StyleID="s27"><Data ss:Type="Number">01079011249</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">오전</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">붕붕</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">아아</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">+821079011249</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">complete</Data></Cell>
+</Row>
+
+<Row>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1594348965083093</Data></Cell>
+<Cell ss:StyleID="s17"><Data ss:Type="DateTime">2026-01-09T09:48:25.000</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120239787884970439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 12.19 청년_정책자금_meta</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237758903750439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_meta</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">120237758903730439</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[new_오너스] 청년_정책자금_meta</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">25411648125139440</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">[내부] new 정책자금</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">false</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">fb</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">아니요</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">개인사업자</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">서비스업</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">1억_미만</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">010-2080-5524</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">오전,오후</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">명운</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">김선영</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">+821020805524</Data></Cell>
+<Cell ss:StyleID="s25"><Data ss:Type="String">complete</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+</Workbook>
