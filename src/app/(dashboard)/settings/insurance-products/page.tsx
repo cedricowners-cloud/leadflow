@@ -356,7 +356,7 @@ export default function InsuranceProductsPage() {
                 <p className="font-medium text-foreground mb-1">계산 공식</p>
                 <p className="bg-muted p-2 rounded font-mono text-xs">
                   수수료 = 월납 금액 ×{" "}
-                  <span className="text-blue-600">보험사 수수료율</span> ×{" "}
+                  <span className="text-blue-600">보험사 수수료율</span> ÷{" "}
                   <span className="text-orange-600">회사 조정률</span>
                 </p>
               </div>
@@ -365,16 +365,16 @@ export default function InsuranceProductsPage() {
                 <div className="space-y-1">
                   <p>
                     • 월납 100만원 × <span className="text-blue-600">150%</span>{" "}
-                    × <span className="text-orange-600">100%</span> ={" "}
+                    ÷ <span className="text-orange-600">105%</span> ={" "}
                     <span className="font-medium text-foreground">
-                      1,500,000원
+                      1,428,571원
                     </span>
                   </p>
                   <p>
                     • 월납 50만원 × <span className="text-blue-600">120%</span>{" "}
-                    × <span className="text-orange-600">80%</span> ={" "}
+                    ÷ <span className="text-orange-600">100%</span> ={" "}
                     <span className="font-medium text-foreground">
-                      480,000원
+                      600,000원
                     </span>
                   </p>
                 </div>
@@ -507,8 +507,8 @@ export default function InsuranceProductsPage() {
                       실효 수수료율:{" "}
                       <span className="font-medium text-foreground">
                         {(
-                          (formData.insurer_commission_rate *
-                            formData.adjustment_rate) /
+                          (formData.insurer_commission_rate /
+                            formData.adjustment_rate) *
                           100
                         ).toFixed(0)}
                         %
@@ -517,9 +517,9 @@ export default function InsuranceProductsPage() {
                     <p className="text-xs text-muted-foreground mt-1">
                       월납 100만원 기준 수수료:{" "}
                       <span className="font-medium text-foreground">
-                        {(
+                        {Math.round(
                           1000000 *
-                          (formData.insurer_commission_rate / 100) *
+                          (formData.insurer_commission_rate / 100) /
                           (formData.adjustment_rate / 100)
                         ).toLocaleString()}
                         원
