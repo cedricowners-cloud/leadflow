@@ -54,6 +54,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { EligibilityCriteriaCard } from "@/components/distribution";
 
 // Types
 interface LeadGrade {
@@ -761,40 +762,12 @@ export default function DistributionRulesPage() {
               </CardContent>
             </Card>
 
-            {/* 기본 규칙 안내 카드 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  기본 배분 자격 기준 안내
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-green-50 p-3 rounded-lg border border-green-100">
-                      <p className="font-medium text-green-700 mb-1">A등급 리드 자격</p>
-                      <p className="text-green-600">전월 보험 월납 ≥ 600,000원</p>
-                    </div>
-                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                      <p className="font-medium text-blue-700 mb-1">B등급 리드 자격</p>
-                      <p className="text-blue-600">전월 보험 월납 ≥ 200,000원 AND &lt; 600,000원</p>
-                    </div>
-                    <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-                      <p className="font-medium text-yellow-700 mb-1">C등급 리드 자격</p>
-                      <p className="text-yellow-600">신입 테스트 통과자 (A등급 자격자 제외)</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                      <p className="font-medium text-gray-700 mb-1">D등급 리드 자격</p>
-                      <p className="text-gray-600">신입 트레이니 (레벨: trainee)</p>
-                    </div>
-                  </div>
-                  <p className="text-xs mt-4">
-                    * 배분 자격은 소프트 적용됩니다 (자격자/비자격자 표시만, 배분 차단 없음)
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* 기본 규칙 안내 카드 - 공통 컴포넌트 사용 */}
+            <EligibilityCriteriaCard
+              title="기본 배분 자격 기준 안내"
+              icon="alert"
+              editable={true}
+            />
           </TabsContent>
 
           {/* 자격자 조회 탭 */}

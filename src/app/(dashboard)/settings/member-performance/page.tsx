@@ -8,13 +8,13 @@ import {
   Users,
   Building2,
   Receipt,
-  Calculator,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Save,
   Package,
 } from "lucide-react";
+import { EligibilityCriteriaCard } from "@/components/distribution";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
@@ -710,39 +710,13 @@ export default function MemberPerformancePage() {
           </Card>
         )}
 
-        {/* 자격 기준 안내 - 시스템 관리자만 표시 */}
-        {canEdit && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calculator className="h-4 w-4" />
-                등급별 배분 자격 기준
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground space-y-2">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="font-medium text-foreground">A등급 자격</p>
-                    <p>전월 월납 ≥ 60만원</p>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="font-medium text-foreground">B등급 자격</p>
-                    <p>전월 월납 ≥ 20만원</p>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="font-medium text-foreground">C등급 자격</p>
-                    <p>신입 TEST 통과자</p>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="font-medium text-foreground">D등급 자격</p>
-                    <p>신입 트레이니</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* 자격 기준 안내 */}
+        <EligibilityCriteriaCard
+          title="등급별 배분 자격 기준"
+          icon="calculator"
+          editable={canEdit}
+          compact={true}
+        />
       </div>
 
       {/* Edit Dialog */}

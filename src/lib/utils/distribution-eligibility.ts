@@ -326,12 +326,35 @@ export interface GradeEligibilityQuick {
   gradeD: boolean;
 }
 
+/**
+ * 배분 자격 기준 설정 인터페이스
+ */
+export interface EligibilityThresholds {
+  grade_a_min_payment: number; // A등급 최소 월납 (원)
+  grade_b_min_payment: number; // B등급 최소 월납 (원)
+  grade_b_max_payment: number; // B등급 최대 월납 (원) - A등급 최소와 동일
+}
+
+/**
+ * 기본 배분 자격 기준
+ */
+export const DEFAULT_ELIGIBILITY_THRESHOLDS: EligibilityThresholds = {
+  grade_a_min_payment: 600000, // 60만원
+  grade_b_min_payment: 200000, // 20만원
+  grade_b_max_payment: 600000, // 60만원
+};
+
 export function evaluateQuickEligibility(
   monthlyPayment: number,
-  isNewbieTestPassed: boolean
+  isNewbieTestPassed: boolean,
+  thresholds?: EligibilityThresholds
 ): GradeEligibilityQuick {
-  const GRADE_A_THRESHOLD = 600000; // 60만원
-  const GRADE_B_MIN_THRESHOLD = 200000; // 20만원
+  // threshold가 제공되지 않으면 기본값 사용
+  const {
+    grade_a_min_payment: GRADE_A_THRESHOLD,
+    grade_b_min_payment: GRADE_B_MIN_THRESHOLD,
+    grade_b_max_payment: GRADE_B_MAX_THRESHOLD,
+  } = thresholds || DEFAULT_ELIGIBILITY_THRESHOLDS;
 
   // 테스트 미통과자는 D등급만 가능
   if (!isNewbieTestPassed) {
@@ -346,7 +369,7 @@ export function evaluateQuickEligibility(
   // 테스트 통과자: 실적에 따라 등급 결정
   const gradeA = monthlyPayment >= GRADE_A_THRESHOLD;
   const gradeB =
-    monthlyPayment >= GRADE_B_MIN_THRESHOLD && monthlyPayment < GRADE_A_THRESHOLD;
+    monthlyPayment >= GRADE_B_MIN_THRESHOLD && monthlyPayment < GRADE_B_MAX_THRESHOLD;
   const gradeC = !gradeA && !gradeB; // A, B 둘 다 아니면 C
   const gradeD = true; // D는 항상 가능
 
@@ -358,9 +381,10 @@ export function evaluateQuickEligibility(
  */
 export function getEligibleGrades(
   monthlyPayment: number,
-  isNewbieTestPassed: boolean
+  isNewbieTestPassed: boolean,
+  thresholds?: EligibilityThresholds
 ): string[] {
-  const eligibility = evaluateQuickEligibility(monthlyPayment, isNewbieTestPassed);
+  const eligibility = evaluateQuickEligibility(monthlyPayment, isNewbieTestPassed, thresholds);
 
   const grades: string[] = [];
 

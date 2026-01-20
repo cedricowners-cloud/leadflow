@@ -7,10 +7,10 @@ import {
   CheckCircle,
   XCircle,
   Building2,
-  Shield,
   Search,
   Filter,
 } from "lucide-react";
+import { EligibilityCriteriaCard } from "@/components/distribution";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
@@ -365,43 +365,11 @@ export default function MemberQualificationsPage() {
         </Card>
 
         {/* Grade Eligibility Info Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              배분 자격 기준 안내
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-green-50 p-3 rounded-lg border border-green-100">
-                  <p className="font-medium text-green-700 mb-1">A등급 리드 자격</p>
-                  <p className="text-green-600">전월 보험 월납 ≥ 60만원</p>
-                  <p className="text-xs text-green-500 mt-1">+ 신입 테스트 통과 필요</p>
-                </div>
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                  <p className="font-medium text-blue-700 mb-1">B등급 리드 자격</p>
-                  <p className="text-blue-600">전월 보험 월납 ≥ 20만원 AND &lt; 60만원</p>
-                  <p className="text-xs text-blue-500 mt-1">+ 신입 테스트 통과 필요</p>
-                </div>
-                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-                  <p className="font-medium text-yellow-700 mb-1">C등급 리드 자격</p>
-                  <p className="text-yellow-600">신입 테스트 통과자</p>
-                  <p className="text-xs text-yellow-500 mt-1">A/B등급 자격자 제외</p>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                  <p className="font-medium text-gray-700 mb-1">D등급 리드 자격</p>
-                  <p className="text-gray-600">신입 테스트 미통과자</p>
-                  <p className="text-xs text-gray-500 mt-1">모든 멤버 배분 가능</p>
-                </div>
-              </div>
-              <p className="mt-4 text-xs">
-                * 신입 테스트 통과 여부는 테스트 상태를 클릭하여 즉시 변경할 수 있습니다.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <EligibilityCriteriaCard
+          title="배분 자격 기준 안내"
+          icon="shield"
+          editable={true}
+        />
       </div>
     </>
   );
