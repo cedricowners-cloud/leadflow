@@ -125,13 +125,9 @@ export function calculatePerformanceSummary(
 }
 
 /**
- * 금액 포맷팅 (원 단위 -> 만원 단위 표시)
+ * 금액 포맷팅 (천 단위 쉼표 표시)
  */
 export function formatCurrency(amount: number, showUnit: boolean = true): string {
-  if (amount >= 10000) {
-    const manWon = amount / 10000;
-    return showUnit ? `${manWon.toLocaleString()}만원` : manWon.toLocaleString();
-  }
   return showUnit ? `${amount.toLocaleString()}원` : amount.toLocaleString();
 }
 

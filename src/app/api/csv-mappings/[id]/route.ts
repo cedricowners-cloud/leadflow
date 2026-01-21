@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { isAdminRole, MemberRole } from "@/lib/constants/roles";
 
 // CSV 매핑 수정 스키마
 const updateMappingSchema = z.object({
@@ -79,7 +80,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .eq("user_id", user.id)
       .single();
 
-    if (!member || member.role !== "system_admin") {
+    if (!member || !isAdminRole(member.role as MemberRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -164,7 +165,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .eq("user_id", user.id)
       .single();
 
-    if (!member || member.role !== "system_admin") {
+    if (!member || !isAdminRole(member.role as MemberRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

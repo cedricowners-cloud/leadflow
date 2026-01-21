@@ -924,7 +924,7 @@ export type Database = {
         | "cancelled"
       grade_source: "auto" | "manual"
       member_level: "trainee" | "regular" | "senior"
-      member_role: "system_admin" | "sales_manager" | "team_leader"
+      member_role: "system_admin" | "branch_manager" | "sales_manager" | "team_leader"
       status_category: "contact" | "meeting" | "contract"
     }
     CompositeTypes: {
@@ -1062,7 +1062,7 @@ export const Constants = {
       ],
       grade_source: ["auto", "manual"],
       member_level: ["trainee", "regular", "senior"],
-      member_role: ["system_admin", "sales_manager", "team_leader"],
+      member_role: ["system_admin", "branch_manager", "sales_manager", "team_leader"],
       status_category: ["contact", "meeting", "contract"],
     },
   },

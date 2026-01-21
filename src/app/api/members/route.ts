@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
+import { isAdminRole, MemberRole } from "@/lib/constants/roles";
 
 // 멤버 생성 스키마
 const createMemberSchema = z.object({
   name: z.string().min(1, "이름을 입력해주세요").max(100),
   email: z.string().email("올바른 이메일 형식을 입력해주세요"),
   phone: z.string().max(20).optional(),
-  role: z.enum(["system_admin", "sales_manager", "team_leader"], {
+  role: z.enum(["system_admin", "branch_manager", "sales_manager", "team_leader"], {
     message: "올바른 역할을 선택해주세요",
   }),
   team_id: z.string().uuid().optional().nullable(),
@@ -137,7 +138,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!currentMember || currentMember.role !== "system_admin") {
+    if (!currentMember || !isAdminRole(currentMember.role as MemberRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

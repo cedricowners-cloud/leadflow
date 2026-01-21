@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
+import { isAdminRole, MemberRole } from "@/lib/constants/roles";
 
 // 멤버 수정 스키마
 const updateMemberSchema = z.object({
@@ -9,7 +10,7 @@ const updateMemberSchema = z.object({
   email: z.string().email("올바른 이메일을 입력해주세요").optional(),
   phone: z.string().max(20).optional(),
   role: z
-    .enum(["system_admin", "sales_manager", "team_leader"], {
+    .enum(["system_admin", "branch_manager", "sales_manager", "team_leader"], {
       message: "올바른 역할을 선택해주세요",
     })
     .optional(),
@@ -91,7 +92,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .eq("user_id", user.id)
       .single();
 
-    if (!currentMember || currentMember.role !== "system_admin") {
+    if (!currentMember || !isAdminRole(currentMember.role as MemberRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -256,7 +257,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .eq("user_id", user.id)
       .single();
 
-    if (!currentMember || currentMember.role !== "system_admin") {
+    if (!currentMember || !isAdminRole(currentMember.role as MemberRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

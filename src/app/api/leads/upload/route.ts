@@ -13,6 +13,7 @@ import {
   Condition,
 } from "@/lib/utils/grade-classifier";
 import { CORE_FIELDS } from "@/lib/constants/lead-fields";
+import { isAdminRole, MemberRole } from "@/lib/constants/roles";
 
 // 코어 필드 목록 (leads 테이블의 실제 컬럼들)
 const CORE_FIELD_NAMES = new Set(CORE_FIELDS.map((f) => f.systemField));
@@ -110,8 +111,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
       );
     }
 
-    // 권한 체크 (시스템 관리자만)
-    if (member.role !== "system_admin") {
+    // 권한 체크 (관리자 권한만 - 시스템 관리자, 지점장)
+    if (!isAdminRole(member.role as MemberRole)) {
       return NextResponse.json(
         { success: false, error: "업로드 권한이 없습니다." },
         { status: 403 }

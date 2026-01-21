@@ -83,7 +83,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 
 // Types
-type MemberRole = "system_admin" | "sales_manager" | "team_leader";
+type MemberRole = "system_admin" | "branch_manager" | "sales_manager" | "team_leader";
 interface Team {
   id: string;
   name: string;
@@ -497,12 +497,39 @@ export default function MemberPerformancePage() {
   };
 
   // Filter members by team
-  const filteredMembers = selectedTeamId === "all"
+  const filteredMembersByTeam = selectedTeamId === "all"
     ? members
     : members.filter((m) => m.team?.id === selectedTeamId);
 
-  // Check if current user can edit (only system_admin can edit all members)
-  const canEdit = currentRole === "system_admin";
+  // Sort members: managers (branch_manager, sales_manager) keep current order, team_leaders sorted by total_commission (highest first)
+  const filteredMembers = [...filteredMembersByTeam].sort((a, b) => {
+    const isAManager = a.role === "branch_manager" || a.role === "sales_manager";
+    const isBManager = b.role === "branch_manager" || b.role === "sales_manager";
+
+    // Managers stay at the top in their original order
+    if (isAManager && isBManager) return 0;
+    if (isAManager) return -1;
+    if (isBManager) return 1;
+
+    // Team leaders sorted by total_commission (highest first)
+    const perfA = getPerformanceForMember(a.id);
+    const perfB = getPerformanceForMember(b.id);
+    const commissionA = perfA?.total_commission || 0;
+    const commissionB = perfB?.total_commission || 0;
+
+    // If commissions are different, sort by commission (highest first)
+    if (commissionA !== commissionB) {
+      return commissionB - commissionA;
+    }
+
+    // If commissions are equal (both 0 or same value), sort by team name
+    const teamNameA = a.team?.name || "";
+    const teamNameB = b.team?.name || "";
+    return teamNameA.localeCompare(teamNameB, "ko");
+  });
+
+  // Check if current user can edit (system_admin or branch_manager can edit all members)
+  const canEdit = currentRole === "system_admin" || currentRole === "branch_manager";
 
   // Check if current user can edit their own performance (sales_manager or team_leader)
   const canEditSelf = currentRole === "sales_manager" || currentRole === "team_leader";
@@ -546,7 +573,7 @@ export default function MemberPerformancePage() {
       .reduce((sum, p) => sum + (p.total_commission || 0), 0),
   };
 
-  // Get page title based on role
+  // Get page title based on role (sales_manager = 부지점장, shows team view)
   const pageTitle = currentRole === "sales_manager" ? "팀 실적 현황" : "멤버 실적 관리";
 
   return (
@@ -582,20 +609,7 @@ export default function MemberPerformancePage() {
         </Card>
 
         {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                입력 현황
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {summaryStats.membersWithPerformance} / {summaryStats.totalMembers}
-              </div>
-              <p className="text-xs text-muted-foreground">명 입력 완료</p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -622,23 +636,6 @@ export default function MemberPerformancePage() {
               <p className="text-xs text-muted-foreground">선택 기간 합계</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                평균 수수료율
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {summaryStats.totalPayment > 0
-                  ? formatCommissionRate(
-                      summaryStats.totalCommission / summaryStats.totalPayment
-                    )
-                  : "0%"}
-              </div>
-              <p className="text-xs text-muted-foreground">전체 평균</p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* My Performance Card - for sales_manager and team_leader */}
@@ -656,7 +653,7 @@ export default function MemberPerformancePage() {
               </div>
               <Button onClick={openSelfEditDialog}>
                 <Plus className="h-4 w-4 mr-2" />
-                {getMyPerformance() ? "수정하기" : "입력하기"}
+                입력하기
               </Button>
             </CardHeader>
             <CardContent>
@@ -754,7 +751,6 @@ export default function MemberPerformancePage() {
                       <TableHead className="text-right">계약 건수</TableHead>
                       <TableHead className="text-right">총 월납</TableHead>
                       <TableHead className="text-right">총 수수료</TableHead>
-                      <TableHead>상태</TableHead>
                       {canEdit && <TableHead className="text-right">액션</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -772,9 +768,13 @@ export default function MemberPerformancePage() {
                           </TableCell>
                           {canEdit && (
                             <TableCell>
-                              {member.role === "sales_manager" ? (
+                              {member.role === "branch_manager" ? (
+                                <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                                  지점장
+                                </Badge>
+                              ) : member.role === "sales_manager" ? (
                                 <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                                  영업관리자
+                                  부지점장
                                 </Badge>
                               ) : (
                                 <Badge variant="outline">팀장</Badge>
@@ -800,13 +800,6 @@ export default function MemberPerformancePage() {
                           <TableCell className="text-right text-primary font-medium">
                             {formatCurrency(perf?.total_commission || 0)}
                           </TableCell>
-                          <TableCell>
-                            {perf ? (
-                              <Badge variant="default">입력완료</Badge>
-                            ) : (
-                              <Badge variant="outline">미입력</Badge>
-                            )}
-                          </TableCell>
                           {canEdit && (
                             <TableCell className="text-right">
                               <Button
@@ -817,7 +810,7 @@ export default function MemberPerformancePage() {
                                   openEditDialog(member);
                                 }}
                               >
-                                {perf ? "수정" : "입력"}
+                                입력
                               </Button>
                             </TableCell>
                           )}

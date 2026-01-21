@@ -65,10 +65,16 @@ const roleGroups: {
     description: "시스템 전체 관리 권한을 가진 관리자입니다.",
   },
   {
+    role: "branch_manager",
+    label: "지점장",
+    icon: Shield,
+    description: "시스템 관리자와 동등한 권한을 가진 지점장입니다.",
+  },
+  {
     role: "sales_manager",
-    label: "영업 관리자",
+    label: "부지점장",
     icon: Briefcase,
-    description: "소속 팀의 리드와 멤버를 관리하는 매니저입니다.",
+    description: "소속 팀의 리드와 멤버를 관리하는 부지점장입니다.",
   },
   {
     role: "team_leader",
@@ -141,6 +147,7 @@ export default function MembersPage() {
   const groupedMembers = useMemo(() => {
     const groups: Record<MemberRole, MemberWithTeam[]> = {
       system_admin: [],
+      branch_manager: [],
       sales_manager: [],
       team_leader: [],
     };
@@ -562,7 +569,8 @@ export default function MembersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="system_admin">시스템 관리자</SelectItem>
-                    <SelectItem value="sales_manager">영업 관리자</SelectItem>
+                    <SelectItem value="branch_manager">지점장</SelectItem>
+                    <SelectItem value="sales_manager">부지점장</SelectItem>
                     <SelectItem value="team_leader">팀장</SelectItem>
                   </SelectContent>
                 </Select>

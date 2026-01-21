@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminRole, MemberRole } from "@/lib/constants/roles";
 
 interface RouteParams {
   params: Promise<{ memberId: string }>;
@@ -126,7 +127,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .eq("user_id", user.id)
       .single();
 
-    if (!member || member.role !== "system_admin") {
+    if (!member || !isAdminRole(member.role as MemberRole)) {
       return NextResponse.json(
         { error: "권한이 없습니다" },
         { status: 403 }

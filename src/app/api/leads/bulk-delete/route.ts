@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { isAdminRole, MemberRole } from "@/lib/constants/roles";
 
 const bulkDeleteSchema = z.object({
   lead_ids: z.array(z.string().uuid()).min(1, "삭제할 리드를 선택해주세요"),
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!member || member.role !== "system_admin") {
+    if (!member || !isAdminRole(member.role as MemberRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
