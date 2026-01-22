@@ -92,9 +92,8 @@ const RAW_FIELD_MAPPINGS: Record<string, string[]> = {
   representative_name: ["이름", "성명", "대표자", "대표자명", "full_name"],
   phone: ["전화번호", "연락처", "휴대폰", "핸드폰", "phone_number", "회신_받으실_번호", "회신번호"],
   company_name: ["업체명", "회사명", "상호", "회사", "company_name"],
-  email: ["이메일", "메일", "email"],
-  // 참고: 보험/채용 관련 필드(insurance_career, corporate_sales_career, qualifications)는
-  // DB에 컬럼이 없어 extra_fields에 자동 저장됨
+  // 참고: DB에 컬럼이 없는 필드들(email, insurance_career, corporate_sales_career, qualifications)은
+  // extra_fields에 자동 저장됨
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse<WebhookResult>> {
