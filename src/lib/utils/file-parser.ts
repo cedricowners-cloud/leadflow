@@ -204,25 +204,37 @@ async function parseExcel(file: File): Promise<ParseResult> {
 
 /**
  * 전화번호 정규화
+ * - 국제번호 형식 (821012345678) → 010-1234-5678
+ * - 앞자리 0 누락 (1012345678) → 010-1234-5678
+ * - 일반 형식 (01012345678) → 010-1234-5678
  */
 export function normalizePhone(phone: string | number | null): string | null {
   if (phone === null || phone === undefined) return null;
 
-  const str = String(phone).replace(/[^0-9]/g, "");
+  let str = String(phone).replace(/[^0-9]/g, "");
 
   if (str.length === 0) return null;
 
-  // 010-XXXX-XXXX 형식으로 변환
+  // 국제번호 형식: 821012345678 (12자리, 82로 시작)
+  // → 82 제거 후 앞에 0 붙이기
+  if (str.length === 12 && str.startsWith("82")) {
+    str = "0" + str.slice(2); // 821012345678 → 01012345678
+  }
+
+  // 앞자리 0 누락: 1012345678 (10자리, 10으로 시작)
+  // → 앞에 0 붙이기
+  if (str.length === 10 && str.startsWith("10")) {
+    str = "0" + str; // 1012345678 → 01012345678
+  }
+
+  // 010-XXXX-XXXX 형식으로 변환 (11자리, 010으로 시작)
   if (str.length === 11 && str.startsWith("010")) {
     return `${str.slice(0, 3)}-${str.slice(3, 7)}-${str.slice(7)}`;
   }
 
-  // 02-XXXX-XXXX 또는 0XX-XXX-XXXX 형식
-  if (str.length === 10) {
-    if (str.startsWith("02")) {
-      return `${str.slice(0, 2)}-${str.slice(2, 6)}-${str.slice(6)}`;
-    }
-    return `${str.slice(0, 3)}-${str.slice(3, 6)}-${str.slice(6)}`;
+  // 02-XXXX-XXXX 형식 (10자리, 02로 시작)
+  if (str.length === 10 && str.startsWith("02")) {
+    return `${str.slice(0, 2)}-${str.slice(2, 6)}-${str.slice(6)}`;
   }
 
   // 그 외에는 원본 반환
