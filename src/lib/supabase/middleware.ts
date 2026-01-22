@@ -37,12 +37,13 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 인증되지 않은 사용자 -> 로그인 페이지로 (login, api/auth, api/seed 제외)
+  // 인증되지 않은 사용자 -> 로그인 페이지로 (login, api/auth, api/seed, api/leads/webhook 제외)
   if (
     !user &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/api/auth") &&
-    !request.nextUrl.pathname.startsWith("/api/seed")
+    !request.nextUrl.pathname.startsWith("/api/seed") &&
+    !request.nextUrl.pathname.startsWith("/api/leads/webhook")
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
