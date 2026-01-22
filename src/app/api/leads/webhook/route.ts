@@ -93,10 +93,8 @@ const RAW_FIELD_MAPPINGS: Record<string, string[]> = {
   phone: ["전화번호", "연락처", "휴대폰", "핸드폰", "phone_number", "회신_받으실_번호", "회신번호"],
   company_name: ["업체명", "회사명", "상호", "회사", "company_name"],
   email: ["이메일", "메일", "email"],
-  // Meta Lead Ads 특수 필드 (보험/채용 관련)
-  insurance_career: ["보험_영업_경력", "보험영업경력", "보험경력"],
-  corporate_sales_career: ["법인_영업_경력", "법인영업경력", "법인경력"],
-  qualifications: ["보유_자격", "보유자격", "자격증"],
+  // 참고: 보험/채용 관련 필드(insurance_career, corporate_sales_career, qualifications)는
+  // DB에 컬럼이 없어 extra_fields에 자동 저장됨
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse<WebhookResult>> {
