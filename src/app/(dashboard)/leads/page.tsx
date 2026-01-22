@@ -15,7 +15,25 @@ import { Button } from "@/components/ui/button";
 import { LeadFilters, LeadFiltersValue } from "@/components/leads/lead-filters";
 import { LeadTable, Lead } from "@/components/leads/lead-table";
 import { BulkActionBar } from "@/components/leads/bulk-action-bar";
-import { Upload, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Upload, Download } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationFirst,
+  PaginationLast,
+} from "@/components/ui/pagination";
 import { toast } from "sonner";
 import {
   ColumnSettingsDialog,
@@ -285,32 +303,29 @@ export default function LeadsPage() {
                   )}
                 </CardDescription>
               </div>
-              {/* 페이지네이션 */}
-              {pagination.totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    {pagination.page} / {pagination.totalPages} 페이지
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page === 1 || loading}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={
-                      pagination.page === pagination.totalPages || loading
-                    }
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+{/* 페이지당 표시 건수 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">표시:</span>
+                <Select
+                  value={pagination.limit.toString()}
+                  onValueChange={(value) => {
+                    setPagination((prev) => ({
+                      ...prev,
+                      limit: parseInt(value),
+                      page: 1,
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="w-[80px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -322,6 +337,105 @@ export default function LeadsPage() {
               onLeadUpdate={handleActionComplete}
               columnSettings={columnSettings}
             />
+
+            {/* 페이지네이션 */}
+            {pagination.totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {((pagination.page - 1) * pagination.limit + 1).toLocaleString()}
+                  {" - "}
+                  {Math.min(
+                    pagination.page * pagination.limit,
+                    pagination.totalCount
+                  ).toLocaleString()}
+                  {" / "}
+                  {pagination.totalCount.toLocaleString()}건
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationFirst
+                        onClick={() => handlePageChange(1)}
+                        disabled={pagination.page === 1 || loading}
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => handlePageChange(pagination.page - 1)}
+                        disabled={pagination.page === 1 || loading}
+                      />
+                    </PaginationItem>
+
+                    {/* 페이지 번호들 */}
+                    {(() => {
+                      const pages: (number | "ellipsis")[] = [];
+                      const current = pagination.page;
+                      const total = pagination.totalPages;
+
+                      if (total <= 7) {
+                        // 7페이지 이하면 모두 표시
+                        for (let i = 1; i <= total; i++) {
+                          pages.push(i);
+                        }
+                      } else {
+                        // 항상 첫 페이지
+                        pages.push(1);
+
+                        if (current > 3) {
+                          pages.push("ellipsis");
+                        }
+
+                        // 현재 페이지 주변
+                        const start = Math.max(2, current - 1);
+                        const end = Math.min(total - 1, current + 1);
+
+                        for (let i = start; i <= end; i++) {
+                          pages.push(i);
+                        }
+
+                        if (current < total - 2) {
+                          pages.push("ellipsis");
+                        }
+
+                        // 항상 마지막 페이지
+                        pages.push(total);
+                      }
+
+                      return pages.map((page, index) =>
+                        page === "ellipsis" ? (
+                          <PaginationItem key={`ellipsis-${index}`}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        ) : (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(page)}
+                              isActive={page === current}
+                              disabled={loading}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      );
+                    })()}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => handlePageChange(pagination.page + 1)}
+                        disabled={pagination.page === pagination.totalPages || loading}
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLast
+                        onClick={() => handlePageChange(pagination.totalPages)}
+                        disabled={pagination.page === pagination.totalPages || loading}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </CardContent>
         </Card>
 

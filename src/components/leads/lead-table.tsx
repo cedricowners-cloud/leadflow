@@ -428,10 +428,17 @@ export function LeadTable({
 
       case "available_time":
         return lead.available_time ? (
-          <div className="flex items-center gap-1.5 text-blue-600">
-            <Clock className="h-3.5 w-3.5" />
-            <span className="text-sm">{lead.available_time}</span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1.5 text-blue-600 max-w-[120px]">
+                <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="text-sm truncate">{lead.available_time}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="text-xs">{lead.available_time}</span>
+            </TooltipContent>
+          </Tooltip>
         ) : (
           <span className="text-muted-foreground">-</span>
         );

@@ -243,6 +243,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
             employee_count: transformedData.employee_count as number | null,
             industry: transformedData.industry as string | null,
             region: transformedData.region as string | null,
+            business_type: transformedData.business_type as string | null,
+            campaign_name: transformedData.campaign_name as string | null,
           },
           gradesWithRules
         );

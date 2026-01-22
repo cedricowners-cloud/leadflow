@@ -76,14 +76,27 @@ interface WebhookLeadData {
 }
 
 // raw_fields에서 시스템 필드로 매핑
+// 주의: 패턴 매칭은 key.toLowerCase().includes(pattern.toLowerCase()) 방식
 const RAW_FIELD_MAPPINGS: Record<string, string[]> = {
   industry: ["업종", "업종을", "업종선택", "업종_선택", "industry", "business_type_field"],
   annual_revenue: ["연매출", "연매출을", "매출", "매출액", "annual_revenue", "revenue"],
   employee_count: ["종업원수", "종업원수를", "직원수", "인원", "employees", "employee_count"],
   region: ["지역", "지역을", "주소", "주소를", "region", "address", "location"],
   business_type: ["사업자", "사업자유형", "사업자를", "business_type"],
-  tax_delinquency: ["세금체납", "세금_체납", "체납", "체납이", "tax_delinquency"],
-  available_time: ["회신시간", "회신받으실", "연락시간", "시간대", "available_time"],
+  tax_delinquency: ["세금체납", "세금_체납", "세급_체납", "체납이_있습니까", "체납", "체납이", "tax_delinquency"],
+  available_time: [
+    "회신시간", "회신받으실", "연락시간", "시간대", "available_time",
+    "연락_가능", "연락가능", "연락_가능_시간", "연락가능시간",
+  ],
+  // 추가 한글 필드 매핑 (n8n/Meta에서 올 수 있는 필드들)
+  representative_name: ["이름", "성명", "대표자", "대표자명", "full_name"],
+  phone: ["전화번호", "연락처", "휴대폰", "핸드폰", "phone_number", "회신_받으실_번호", "회신번호"],
+  company_name: ["업체명", "회사명", "상호", "회사", "company_name"],
+  email: ["이메일", "메일", "email"],
+  // Meta Lead Ads 특수 필드 (보험/채용 관련)
+  insurance_career: ["보험_영업_경력", "보험영업경력", "보험경력"],
+  corporate_sales_career: ["법인_영업_경력", "법인영업경력", "법인경력"],
+  qualifications: ["보유_자격", "보유자격", "자격증"],
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse<WebhookResult>> {
@@ -203,6 +216,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<WebhookRe
             employee_count: transformedData.employee_count as number | null,
             industry: transformedData.industry as string | null,
             region: transformedData.region as string | null,
+            business_type: transformedData.business_type as string | null,
+            campaign_name: transformedData.campaign_name as string | null,
           },
           gradesWithRules
         );
@@ -303,10 +318,30 @@ function transformWebhookLead(lead: WebhookLeadData): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   const extraFields: Record<string, unknown> = {};
 
-  // 기본 필드 매핑
-  result.representative_name = lead.full_name?.trim() || null;
-  result.phone = normalizePhone(lead.phone_number || null);
-  result.company_name = lead.company_name?.trim() || null;
+  // raw_fields에서 기본 필드 추출 (n8n이 raw_fields에 넣는 경우가 있음)
+  const rawFields = lead.raw_fields || {};
+
+  // 이름: full_name 또는 raw_fields의 full_name/이름
+  const fullName = lead.full_name
+    || (rawFields.full_name as string)
+    || (rawFields.이름 as string);
+  result.representative_name = fullName?.toString().trim() || null;
+
+  // 전화번호: phone_number 또는 raw_fields의 phone_number/전화번호/회신_받으실_번호...
+  const phoneNumber = lead.phone_number
+    || (rawFields.phone_number as string)
+    || (rawFields.전화번호 as string)
+    || findRawFieldValue(rawFields, ["회신_받으실_번호", "회신번호", "연락처"]);
+  result.phone = normalizePhone(phoneNumber?.toString() || null);
+
+  // 회사명: company_name 또는 raw_fields의 company_name/업체명/회사명
+  const companyName = lead.company_name
+    || (rawFields.company_name as string)
+    || (rawFields.업체명 as string)
+    || (rawFields.회사명 as string);
+  result.company_name = companyName?.toString().trim() || null;
+
+  // 생성일
   result.source_date = lead.created_at ? parseDate(lead.created_at) : null;
 
   // 소스 구분 (meta_lead_ads로 통일)
@@ -415,6 +450,25 @@ function transformWebhookLead(lead: WebhookLeadData): Record<string, unknown> {
 }
 
 /**
+ * raw_fields에서 패턴과 일치하는 키의 값 찾기
+ */
+function findRawFieldValue(
+  rawFields: Record<string, unknown>,
+  patterns: string[]
+): string | null {
+  for (const [key, value] of Object.entries(rawFields)) {
+    if (value === null || value === undefined || value === "") continue;
+    const lowerKey = key.toLowerCase();
+    for (const pattern of patterns) {
+      if (lowerKey.includes(pattern.toLowerCase())) {
+        return String(value).trim();
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * raw_fields 값 처리
  */
 function processRawFieldValue(
@@ -429,7 +483,9 @@ function processRawFieldValue(
 
   switch (systemField) {
     case "tax_delinquency":
-      return ["네", "있음", "yes", "true", "1", "y"].includes(
+      // "예", "네" 모두 한국어 긍정 응답으로 처리
+      // toLowerCase()는 한글에 영향 없지만 영문 처리를 위해 유지
+      return ["예", "네", "있음", "yes", "true", "1", "y"].includes(
         strValue.toLowerCase()
       );
 

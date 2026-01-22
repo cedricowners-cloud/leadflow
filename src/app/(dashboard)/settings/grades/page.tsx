@@ -13,6 +13,7 @@ import {
   X,
   Users,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/header";
@@ -213,6 +214,11 @@ export default function GradesSettingsPage() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  // Reclassify state
+  const [reclassifying, setReclassifying] = useState(false);
+  const [reclassifyDialogOpen, setReclassifyDialogOpen] = useState(false);
+  const [reclassifyMode, setReclassifyMode] = useState<"auto_only" | "all">("auto_only");
+
   // Fetch grades
   const fetchGrades = useCallback(async () => {
     try {
@@ -255,6 +261,46 @@ export default function GradesSettingsPage() {
     fetchGrades();
     fetchRules();
   }, [fetchGrades, fetchRules]);
+
+  // Reclassify handler
+  const handleReclassify = async () => {
+    setReclassifying(true);
+    try {
+      const response = await fetch("/api/grade-rules/reclassify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: reclassifyMode }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "재분류에 실패했습니다");
+      }
+
+      // 결과 표시
+      const { totalCount, updatedCount, gradeSummary } = result.data;
+      const summaryText = Object.entries(gradeSummary)
+        .map(([grade, count]) => `${grade}: ${count}건`)
+        .join(", ");
+
+      toast.success(
+        `재분류 완료: ${totalCount}건 중 ${updatedCount}건 변경됨`,
+        {
+          description: summaryText,
+          duration: 5000,
+        }
+      );
+
+      setReclassifyDialogOpen(false);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "재분류에 실패했습니다"
+      );
+    } finally {
+      setReclassifying(false);
+    }
+  };
 
   // Grade dialog handlers
   const openGradeDialog = (grade?: LeadGrade) => {
@@ -798,10 +844,20 @@ export default function GradesSettingsPage() {
                     규칙은 등급 우선순위 순서대로 평가됩니다.
                   </CardDescription>
                 </div>
-                <Button onClick={() => openRuleDialog()} disabled={grades.length === 0}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  규칙 추가
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setReclassifyDialogOpen(true)}
+                    disabled={rules.length === 0}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    기존 리드 재분류
+                  </Button>
+                  <Button onClick={() => openRuleDialog()} disabled={grades.length === 0}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    규칙 추가
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {rulesLoading ? (
@@ -1353,6 +1409,60 @@ export default function GradesSettingsPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {submitting ? "삭제 중..." : "삭제"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 기존 리드 재분류 확인 다이얼로그 */}
+      <AlertDialog open={reclassifyDialogOpen} onOpenChange={setReclassifyDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>기존 리드 재분류</AlertDialogTitle>
+            <AlertDialogDescription>
+              현재 등급 규칙을 기존 리드에 적용하여 등급을 다시 분류합니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>재분류 대상</Label>
+              <Select
+                value={reclassifyMode}
+                onValueChange={(value: "auto_only" | "all") => setReclassifyMode(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto_only">
+                    자동 분류된 리드만 (수동 변경 유지)
+                  </SelectItem>
+                  <SelectItem value="all">
+                    전체 리드 (수동 변경 포함)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {reclassifyMode === "auto_only"
+                  ? "수동으로 변경한 등급은 유지되고, 자동 분류된 리드만 재분류됩니다."
+                  : "모든 리드의 등급이 현재 규칙에 따라 재분류됩니다."}
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reclassifying}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleReclassify}
+              disabled={reclassifying}
+            >
+              {reclassifying ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  재분류 중...
+                </>
+              ) : (
+                "재분류 실행"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
