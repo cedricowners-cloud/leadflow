@@ -245,6 +245,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
             region: transformedData.region as string | null,
             business_type: transformedData.business_type as string | null,
             campaign_name: transformedData.campaign_name as string | null,
+            tax_delinquency: transformedData.tax_delinquency as boolean | null,
           },
           gradesWithRules
         );

@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     // 재분류 대상 리드 조회
     let leadsQuery = adminSupabase
       .from("leads")
-      .select("id, annual_revenue, employee_count, industry, region, business_type, campaign_name, grade_id, grade_source");
+      .select("id, annual_revenue, employee_count, industry, region, business_type, campaign_name, tax_delinquency, grade_id, grade_source");
 
     // mode가 "auto_only"인 경우 자동분류된 리드만 대상
     if (mode === "auto_only") {
@@ -131,6 +131,7 @@ export async function POST(request: NextRequest) {
           region: lead.region,
           business_type: lead.business_type,
           campaign_name: lead.campaign_name,
+          tax_delinquency: lead.tax_delinquency,
         },
         gradesWithRules
       );

@@ -29,6 +29,7 @@ export interface LeadData {
   region?: string | null;
   business_type?: string | null;
   campaign_name?: string | null;
+  tax_delinquency?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -62,6 +63,22 @@ export function classifyGrade(
 
   // 기본 등급 찾기
   const defaultGrade = sortedGrades.find((g) => g.is_default);
+
+  // ⚠️ 세금체납이 있으면 무조건 D등급 (기본 등급) 강제 반환
+  if (lead.tax_delinquency === true && defaultGrade) {
+    evaluationLog.push({
+      grade_name: defaultGrade.name,
+      rule_description: "세금체납 강제 규칙",
+      result: true,
+      details: "세금체납이 있는 업체는 다른 조건에 관계없이 기본 등급(D)이 부여됩니다.",
+    });
+
+    return {
+      grade_id: defaultGrade.id,
+      grade_name: defaultGrade.name,
+      evaluation_log: evaluationLog,
+    };
+  }
 
   // 각 등급의 규칙 평가
   for (const grade of sortedGrades) {
@@ -345,6 +362,7 @@ function formatFieldName(field: string): string {
     representative_name: "대표자명",
     business_type: "사업자 유형",
     campaign_name: "광고 캠페인",
+    tax_delinquency: "세금체납",
   };
   return fieldMap[field] || field;
 }
