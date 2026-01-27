@@ -316,6 +316,32 @@ export async function POST(request: NextRequest): Promise<NextResponse<WebhookRe
   }
 }
 
+// leads 테이블 varchar 컬럼별 최대 길이 (DB 스키마 기준)
+const VARCHAR_LIMITS: Record<string, number> = {
+  representative_name: 200,
+  phone: 100,
+  company_name: 200,
+  industry: 255,
+  region: 255,
+  campaign_name: 200,
+  ad_set_name: 200,
+  ad_name: 200,
+  available_time: 255,
+  business_type: 255,
+  source: 100,
+  platform: 100,
+};
+
+/** varchar 필드를 DB 제한 길이에 맞게 자르기 */
+function truncateVarcharFields(data: Record<string, unknown>): Record<string, unknown> {
+  for (const [field, maxLen] of Object.entries(VARCHAR_LIMITS)) {
+    if (typeof data[field] === "string" && (data[field] as string).length > maxLen) {
+      data[field] = (data[field] as string).slice(0, maxLen);
+    }
+  }
+  return data;
+}
+
 /**
  * Webhook 리드 데이터를 leads 테이블 형식으로 변환
  */
@@ -451,7 +477,8 @@ function transformWebhookLead(lead: WebhookLeadData): Record<string, unknown> {
     result.extra_fields = extraFields;
   }
 
-  return result;
+  // varchar 필드 길이 제한 적용 (DB 제약 조건 초과 방지)
+  return truncateVarcharFields(result);
 }
 
 /**
