@@ -16,7 +16,7 @@ const querySchema = z.object({
   assignedStatus: z.enum(["all", "assigned", "unassigned"]).default("all"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  sortBy: z.string().default("created_at"),
+  sortBy: z.string().default("source_date"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       assignedStatus: searchParams.get("assignedStatus") || "all",
       startDate: searchParams.get("startDate") || undefined,
       endDate: searchParams.get("endDate") || undefined,
-      sortBy: searchParams.get("sortBy") || "created_at",
+      sortBy: searchParams.get("sortBy") || "source_date",
       sortOrder: searchParams.get("sortOrder") || "desc",
     };
 
@@ -214,8 +214,17 @@ export async function GET(request: NextRequest) {
       "source_date",
       "assigned_at",
     ];
-    const sortColumn = validSortColumns.includes(sortBy) ? sortBy : "created_at";
-    query = query.order(sortColumn, { ascending: sortOrder === "asc" });
+    const sortColumn = validSortColumns.includes(sortBy) ? sortBy : "source_date";
+    query = query.order(sortColumn, {
+      ascending: sortOrder === "asc",
+      nullsFirst: false,
+    });
+    // source_date 정렬 시 null 대비 보조 정렬
+    if (sortColumn === "source_date") {
+      query = query.order("created_at", {
+        ascending: sortOrder === "asc",
+      });
+    }
 
     // 페이지네이션
     const from = (page - 1) * limit;
