@@ -77,7 +77,16 @@ interface WebhookLeadData {
 
 // raw_fields에서 시스템 필드로 매핑
 // 주의: 패턴 매칭은 key.toLowerCase().includes(pattern.toLowerCase()) 방식
+// 주의: 매핑 순서가 중요합니다!
+// - phone이 available_time보다 먼저 와야 "회신받으실_번호" 같은 키가 phone에 매핑됩니다.
+// - "회신받으실"은 번호 필드와 시간 필드 양쪽에 나타날 수 있으므로, 정확한 패턴을 사용합니다.
 const RAW_FIELD_MAPPINGS: Record<string, string[]> = {
+  // phone을 available_time보다 먼저 배치 (패턴 충돌 방지)
+  phone: [
+    "전화번호", "연락처", "휴대폰", "핸드폰", "phone_number",
+    "회신_받으실_번호", "회신받으실_번호", "회신번호",
+    "번호를_작성", "번호를작성",
+  ],
   industry: ["업종", "업종을", "업종선택", "업종_선택", "industry", "business_type_field"],
   annual_revenue: ["연매출", "연매출을", "매출", "매출액", "annual_revenue", "revenue"],
   employee_count: ["종업원수", "종업원수를", "직원수", "인원", "employees", "employee_count"],
@@ -85,12 +94,11 @@ const RAW_FIELD_MAPPINGS: Record<string, string[]> = {
   business_type: ["사업자", "사업자유형", "사업자를", "business_type"],
   tax_delinquency: ["세금체납", "세금_체납", "세급_체납", "체납이_있습니까", "체납", "체납이", "tax_delinquency"],
   available_time: [
-    "회신시간", "회신받으실", "연락시간", "시간대", "available_time",
+    "회신시간", "회신받으실_시간", "회신받으실시간",
+    "연락시간", "시간대", "available_time",
     "연락_가능", "연락가능", "연락_가능_시간", "연락가능시간",
   ],
-  // 추가 한글 필드 매핑 (n8n/Meta에서 올 수 있는 필드들)
   representative_name: ["이름", "성명", "대표자", "대표자명", "full_name"],
-  phone: ["전화번호", "연락처", "휴대폰", "핸드폰", "phone_number", "회신_받으실_번호", "회신번호"],
   company_name: ["업체명", "회사명", "상호", "회사", "company_name"],
   // 참고: DB에 컬럼이 없는 필드들(email, insurance_career, corporate_sales_career, qualifications)은
   // extra_fields에 자동 저장됨
