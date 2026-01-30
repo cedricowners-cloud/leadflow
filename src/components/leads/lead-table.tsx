@@ -61,6 +61,9 @@ export interface Lead {
   form_name: string | null;
   platform: string | null;
   is_organic: boolean | null;
+  // 리드 타입 및 추가 필드
+  lead_type: "sales" | "recruit" | null;
+  extra_fields: Record<string, unknown> | null;
   grade: {
     id: string;
     name: string;
@@ -80,6 +83,7 @@ export interface Lead {
 interface Member {
   id: string;
   name: string;
+  role: string;
   team: { id: string; name: string } | null;
   monthly_lead_count?: number;
 }
@@ -194,23 +198,45 @@ export function LeadTable({
       .sort((a, b) => a.display_order - b.display_order);
   }, [columnSettings]);
 
-  // 팀장 목록 로드 함수 (이번 달 배분 수 포함)
+  // 팀장 및 관리자 목록 로드 함수 (이번 달 배분 수 포함)
   const fetchMembers = async () => {
     try {
-      const response = await fetch("/api/members?role=team_leader&is_active=true&include_monthly_count=true");
-      const result = await response.json();
+      // 팀장과 관리자(지점장, 부지점장) 모두 가져오기
+      const [teamLeaderRes, salesManagerRes, branchManagerRes] = await Promise.all([
+        fetch("/api/members?role=team_leader&is_active=true&include_monthly_count=true"),
+        fetch("/api/members?role=sales_manager&is_active=true&include_monthly_count=true"),
+        fetch("/api/members?role=branch_manager&is_active=true&include_monthly_count=true"),
+      ]);
 
-      if (result.data) {
-        const transformedData = result.data.map((m: { id: string; name: string; team: { id: string; name: string } | { id: string; name: string }[] | null; monthly_lead_count?: number }) => ({
-          id: m.id,
-          name: m.name,
-          team: Array.isArray(m.team) ? m.team[0] || null : m.team,
-          monthly_lead_count: m.monthly_lead_count || 0,
-        })) as Member[];
-        setMembers(transformedData);
+      const [teamLeaderData, salesManagerData, branchManagerData] = await Promise.all([
+        teamLeaderRes.json(),
+        salesManagerRes.json(),
+        branchManagerRes.json(),
+      ]);
+
+      const transformMember = (m: { id: string; name: string; role: string; team: { id: string; name: string } | { id: string; name: string }[] | null; monthly_lead_count?: number }) => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
+        team: Array.isArray(m.team) ? m.team[0] || null : m.team,
+        monthly_lead_count: m.monthly_lead_count || 0,
+      });
+
+      const allMembers: Member[] = [];
+
+      if (teamLeaderData.data) {
+        allMembers.push(...teamLeaderData.data.map(transformMember));
       }
+      if (salesManagerData.data) {
+        allMembers.push(...salesManagerData.data.map(transformMember));
+      }
+      if (branchManagerData.data) {
+        allMembers.push(...branchManagerData.data.map(transformMember));
+      }
+
+      setMembers(allMembers);
     } catch (error) {
-      console.error("팀장 목록 로드 실패:", error);
+      console.error("멤버 목록 로드 실패:", error);
     }
   };
 
@@ -272,18 +298,23 @@ export function LeadTable({
     }
   };
 
-  // 팀별 멤버 그룹화 (팀명 정렬)
-  const membersByTeamSorted = useMemo(() => {
-    // 1. 팀별로 그룹화
+  // 관리자와 팀장을 분리하여 그룹화
+  const { managers, membersByTeamSorted } = useMemo(() => {
+    // 관리자 역할 (지점장, 부지점장)
+    const managerRoles = ["branch_manager", "sales_manager"];
+    const managerList = members.filter((m) => managerRoles.includes(m.role));
+    const teamLeaders = members.filter((m) => m.role === "team_leader");
+
+    // 팀장들을 팀별로 그룹화
     const teamMap: Record<string, Member[]> = {};
-    members.forEach((member) => {
+    teamLeaders.forEach((member) => {
       const teamName = member.team?.name || "미배정";
       if (!teamMap[teamName]) teamMap[teamName] = [];
       teamMap[teamName].push(member);
     });
 
-    // 2. 팀명으로 정렬된 배열로 변환
-    return Object.entries(teamMap)
+    // 팀명으로 정렬된 배열로 변환
+    const sortedTeams = Object.entries(teamMap)
       .sort(([teamA], [teamB]) => {
         // "미배정"은 맨 뒤로
         if (teamA === "미배정") return 1;
@@ -294,6 +325,20 @@ export function LeadTable({
         teamName,
         members: teamMembers,
       }));
+
+    // 관리자도 팀명으로 정렬
+    const sortedManagers = [...managerList].sort((a, b) => {
+      const teamA = a.team?.name || "미배정";
+      const teamB = b.team?.name || "미배정";
+      if (teamA === "미배정") return 1;
+      if (teamB === "미배정") return -1;
+      return teamA.localeCompare(teamB, "ko");
+    });
+
+    return {
+      managers: sortedManagers,
+      membersByTeamSorted: sortedTeams,
+    };
   }, [members]);
 
   // 등급별 자격자 목록 로드 함수
@@ -534,6 +579,28 @@ export function LeadTable({
               {/* 등급이 있고 자격 정보가 로드된 경우: 자격자/비자격자로 그룹화 */}
               {gradeName && eligibilityData ? (
                 <>
+                  {/* 관리자 그룹 (지점장, 부지점장) - 최상단 */}
+                  {managers.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="text-blue-600 bg-blue-50">
+                        관리자
+                      </SelectLabel>
+                      {managers.map((manager) => (
+                        <SelectItem key={manager.id} value={manager.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{manager.name}</span>
+                            <span className="text-xs text-blue-500">
+                              ({manager.role === "branch_manager" ? "지점장" : "부지점장"})
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              - 배분: {manager.monthly_lead_count || 0}건
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+
                   {/* 자격자 그룹 */}
                   {eligibilityData.eligibleMembers.length > 0 && (
                     <SelectGroup>
@@ -618,24 +685,45 @@ export function LeadTable({
                   자격 정보 로딩 중...
                 </div>
               ) : (
-                /* 등급이 없거나 자격 정보가 없는 경우: 기존 팀별 그룹화 (팀명 정렬) */
-                membersByTeamSorted.map(({ teamName, members: teamMembers }) => (
-                  <div key={teamName}>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
-                      {teamName}
-                    </div>
-                    {teamMembers.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        <span className="flex items-center justify-between w-full gap-2">
-                          <span>{member.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({member.monthly_lead_count || 0})
+                /* 등급이 없거나 자격 정보가 없는 경우: 관리자 + 팀별 그룹화 */
+                <>
+                  {/* 관리자 그룹 (지점장, 부지점장) */}
+                  {managers.length > 0 && (
+                    <div>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50">
+                        관리자
+                      </div>
+                      {managers.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          <span className="flex items-center justify-between w-full gap-2">
+                            <span>{member.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({member.monthly_lead_count || 0})
+                            </span>
                           </span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))
+                        </SelectItem>
+                      ))}
+                    </div>
+                  )}
+                  {/* 팀별 팀장 그룹 */}
+                  {membersByTeamSorted.map(({ teamName, members: teamMembers }) => (
+                    <div key={teamName}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
+                        {teamName}
+                      </div>
+                      {teamMembers.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          <span className="flex items-center justify-between w-full gap-2">
+                            <span>{member.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({member.monthly_lead_count || 0})
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </div>
+                  ))}
+                </>
               )}
             </SelectContent>
           </Select>
@@ -722,7 +810,7 @@ export function LeadTable({
 
   return (
     <TooltipProvider>
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border overflow-x-auto max-w-full">
         <Table>
           <TableHeader>
             <TableRow>

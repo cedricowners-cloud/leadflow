@@ -14,6 +14,7 @@ const querySchema = z.object({
   meetingStatusId: z.string().uuid().optional(),
   contractStatusId: z.string().uuid().optional(),
   assignedStatus: z.enum(["all", "assigned", "unassigned"]).default("all"),
+  leadType: z.enum(["all", "sales", "recruit"]).default("sales"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   sortBy: z.string().default("source_date"),
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest) {
       meetingStatusId: searchParams.get("meetingStatusId") || undefined,
       contractStatusId: searchParams.get("contractStatusId") || undefined,
       assignedStatus: searchParams.get("assignedStatus") || "all",
+      leadType: searchParams.get("leadType") || "sales",
       startDate: searchParams.get("startDate") || undefined,
       endDate: searchParams.get("endDate") || undefined,
       sortBy: searchParams.get("sortBy") || "source_date",
@@ -86,6 +88,7 @@ export async function GET(request: NextRequest) {
       meetingStatusId,
       contractStatusId,
       assignedStatus,
+      leadType,
       startDate,
       endDate,
       sortBy,
@@ -195,6 +198,11 @@ export async function GET(request: NextRequest) {
       query = query.not("assigned_member_id", "is", null);
     } else if (assignedStatus === "unassigned") {
       query = query.is("assigned_member_id", null);
+    }
+
+    // 리드 타입 필터
+    if (leadType !== "all") {
+      query = query.eq("lead_type", leadType);
     }
 
     // 날짜 필터

@@ -37,7 +37,7 @@ export default async function DashboardLayout({
   return (
     <SidebarProvider>
       <ClientSidebarWrapper user={userData} />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset className="overflow-hidden">{children}</SidebarInset>
     </SidebarProvider>
   );
 }

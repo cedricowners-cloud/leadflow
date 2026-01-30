@@ -42,6 +42,25 @@ export interface SyncOptions {
   syncType?: 'manual' | 'scheduled' | 'webhook';
 }
 
+/** 리드 타입 */
+export type LeadType = 'sales' | 'recruit';
+
+/** 리크루팅 캠페인 식별 키워드 */
+const RECRUIT_KEYWORDS = [
+  '리크루팅',
+  '리쿠르팅',
+  '채용',
+  '구인',
+  '인재',
+  '모집',
+  'recruit',
+  'recruiting',
+  'hiring',
+  'job',
+  '입사',
+  '지원',
+];
+
 export class MetaSyncService {
   private supabase: SupabaseClient;
   private parser: MetaLeadParser;
@@ -49,6 +68,28 @@ export class MetaSyncService {
   constructor(supabase: SupabaseClient, parser?: MetaLeadParser) {
     this.supabase = supabase;
     this.parser = parser || metaLeadParser;
+  }
+
+  /**
+   * 캠페인 이름 기반으로 리드 타입 판별
+   * 리크루팅 관련 키워드가 포함되어 있으면 'recruit', 그 외에는 'sales'
+   */
+  private determineLeadType(lead: ParsedMetaLead): LeadType {
+    const searchText = [
+      lead.campaign_name,
+      lead.ad_set_name,
+      lead.ad_name,
+      lead.form_name,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    const isRecruit = RECRUIT_KEYWORDS.some((keyword) =>
+      searchText.includes(keyword.toLowerCase())
+    );
+
+    return isRecruit ? 'recruit' : 'sales';
   }
 
   /**
@@ -324,6 +365,7 @@ export class MetaSyncService {
 
       try {
         const gradeId = gradeMap.get(lead.grade) || gradeMap.get('D');
+        const leadType = this.determineLeadType(lead);
 
         const { error: insertError } = await this.supabase
           .from('leads')
@@ -353,6 +395,7 @@ export class MetaSyncService {
             upload_batch_id: batch.id,
             source: 'meta_lead_ads',
             extra_fields: lead.raw_fields,
+            lead_type: leadType,
           });
 
         if (insertError) {

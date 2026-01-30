@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { LeadFilters, LeadFiltersValue } from "@/components/leads/lead-filters";
 import { LeadTable, Lead } from "@/components/leads/lead-table";
+import { RecruitLeadTable } from "@/components/leads/recruit-lead-table";
 import { BulkActionBar } from "@/components/leads/bulk-action-bar";
 import { Upload, Download } from "lucide-react";
 import {
@@ -23,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Pagination,
   PaginationContent,
@@ -61,12 +63,15 @@ const initialFilters: LeadFiltersValue = {
   endDate: undefined,
 };
 
+type LeadType = "sales" | "recruit";
+
 export default function LeadsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [leadType, setLeadType] = useState<LeadType>("sales");
   const [filters, setFilters] = useState<LeadFiltersValue>(initialFilters);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -142,6 +147,7 @@ export default function LeadsPage() {
       });
 
       // 필터 적용
+      params.set("leadType", leadType);
       if (filters.search) params.set("search", filters.search);
       if (filters.gradeId) params.set("gradeId", filters.gradeId);
       if (filters.teamId) params.set("teamId", filters.teamId);
@@ -182,7 +188,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, filters]);
+  }, [pagination.page, pagination.limit, filters, leadType]);
 
   // 초기 로드 및 필터 변경 시 재조회
   useEffect(() => {
@@ -257,7 +263,7 @@ export default function LeadsPage() {
         title="리드 관리"
         description="업로드된 리드를 조회하고 팀장에게 배분합니다."
       />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col gap-4 p-4 min-w-0">
         {/* 필터 */}
         <LeadFilters
           value={filters}
@@ -289,11 +295,29 @@ export default function LeadsPage() {
         </div>
 
         {/* 리드 테이블 */}
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>리드 목록</CardTitle>
+            <div className="flex flex-col gap-4">
+              {/* 리드 타입 탭 */}
+              <Tabs
+                value={leadType}
+                onValueChange={(value) => {
+                  setLeadType(value as LeadType);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                  setSelectedIds([]);
+                }}
+              >
+                <TabsList>
+                  <TabsTrigger value="sales">영업 리드</TabsTrigger>
+                  <TabsTrigger value="recruit">채용 리드</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>
+                    {leadType === "sales" ? "영업 리드 목록" : "채용 리드 목록"}
+                  </CardTitle>
                 <CardDescription>
                   총 {pagination.totalCount.toLocaleString()}건의 리드
                   {selectedIds.length > 0 && (
@@ -327,21 +351,34 @@ export default function LeadsPage() {
                 </Select>
               </div>
             </div>
+          </div>
           </CardHeader>
-          <CardContent>
-            <LeadTable
-              leads={leads}
-              loading={loading}
-              selectedIds={selectedIds}
-              onSelectionChange={handleSelectionChange}
-              onLeadUpdate={handleActionComplete}
-              columnSettings={columnSettings}
-            />
+          <CardContent className="p-0">
+            <div className="overflow-x-auto px-4 py-2">
+              {leadType === "recruit" ? (
+                <RecruitLeadTable
+                  leads={leads}
+                  loading={loading}
+                  selectedIds={selectedIds}
+                  onSelectionChange={handleSelectionChange}
+                  onLeadUpdate={handleActionComplete}
+                />
+              ) : (
+                <LeadTable
+                  leads={leads}
+                  loading={loading}
+                  selectedIds={selectedIds}
+                  onSelectionChange={handleSelectionChange}
+                  onLeadUpdate={handleActionComplete}
+                  columnSettings={columnSettings}
+                />
+              )}
+            </div>
 
             {/* 페이지네이션 */}
             {pagination.totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
+              <div className="mt-4 px-4 pb-4 flex items-center justify-between gap-4">
+                <div className="text-sm text-muted-foreground whitespace-nowrap shrink-0">
                   {((pagination.page - 1) * pagination.limit + 1).toLocaleString()}
                   {" - "}
                   {Math.min(
