@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Award,
   GitBranch,
+  Facebook,
   type LucideIcon,
 } from "lucide-react";
 
@@ -56,6 +57,7 @@ const adminMenu: NavGroup[] = [
       { label: "등급 설정", href: "/settings/grades", icon: Star },
       { label: "배분 규칙", href: "/settings/distribution-rules", icon: GitBranch },
       { label: "CSV 매핑", href: "/settings/csv-mapping", icon: FileSpreadsheet },
+      { label: "Meta 연동", href: "/settings/meta-integration", icon: Facebook },
       { label: "시스템 설정", href: "/settings", icon: Settings },
     ],
   },
