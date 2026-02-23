@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { z } from "zod";
 
 const querySchema = z.object({
+  ids: z.string().optional(), // 쉼표 구분 UUID 목록 (선택 내보내기)
   search: z.string().optional(),
   gradeId: z.string().uuid().optional(),
   teamId: z.string().uuid().optional(),
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
     // 쿼리 파라미터 파싱
     const searchParams = request.nextUrl.searchParams;
     const result = querySchema.safeParse({
+      ids: searchParams.get("ids") || undefined,
       search: searchParams.get("search") || undefined,
       gradeId: searchParams.get("gradeId") || undefined,
       teamId: searchParams.get("teamId") || undefined,
@@ -72,6 +74,11 @@ export async function GET(request: NextRequest) {
 
     const params = result.data;
 
+    // 선택된 ID 파싱
+    const selectedIds = params.ids
+      ? params.ids.split(",").filter((id) => id.trim())
+      : [];
+
     // 쿼리 구성 (페이지네이션 없이 전체 조회, 최대 10,000건)
     let query = supabase.from("leads").select(
       `
@@ -86,6 +93,11 @@ export async function GET(request: NextRequest) {
         contract_status:lead_statuses!leads_contract_status_id_fkey(id, name)
       `
     );
+
+    // 선택 내보내기: ID 목록이 있으면 해당 리드만 조회
+    if (selectedIds.length > 0) {
+      query = query.in("id", selectedIds);
+    }
 
     // 역할별 필터링
     if (member.role === "team_leader") {
@@ -109,45 +121,46 @@ export async function GET(request: NextRequest) {
             teamMembers.map((m) => m.id)
           );
         } else {
-          // 빈 결과
           return createEmptyExcel(params.leadType);
         }
       }
     }
 
-    // 필터 적용
-    if (params.search) {
-      query = query.or(
-        `company_name.ilike.%${params.search}%,representative_name.ilike.%${params.search}%,phone.ilike.%${params.search}%`
-      );
-    }
-    if (params.gradeId) query = query.eq("grade_id", params.gradeId);
-    if (params.teamId && member.role === "system_admin") {
-      const { data: teamMembers } = await supabase
-        .from("members")
-        .select("id")
-        .eq("team_id", params.teamId);
-      if (teamMembers && teamMembers.length > 0) {
-        query = query.in(
-          "assigned_member_id",
-          teamMembers.map((m) => m.id)
+    // 필터 적용 (선택 내보내기가 아닌 경우에만)
+    if (selectedIds.length === 0) {
+      if (params.search) {
+        query = query.or(
+          `company_name.ilike.%${params.search}%,representative_name.ilike.%${params.search}%,phone.ilike.%${params.search}%`
         );
       }
+      if (params.gradeId) query = query.eq("grade_id", params.gradeId);
+      if (params.teamId && member.role === "system_admin") {
+        const { data: teamMembers } = await supabase
+          .from("members")
+          .select("id")
+          .eq("team_id", params.teamId);
+        if (teamMembers && teamMembers.length > 0) {
+          query = query.in(
+            "assigned_member_id",
+            teamMembers.map((m) => m.id)
+          );
+        }
+      }
+      if (params.memberId) query = query.eq("assigned_member_id", params.memberId);
+      if (params.contactStatusId)
+        query = query.eq("contact_status_id", params.contactStatusId);
+      if (params.meetingStatusId)
+        query = query.eq("meeting_status_id", params.meetingStatusId);
+      if (params.contractStatusId)
+        query = query.eq("contract_status_id", params.contractStatusId);
+      if (params.assignedStatus === "assigned")
+        query = query.not("assigned_member_id", "is", null);
+      else if (params.assignedStatus === "unassigned")
+        query = query.is("assigned_member_id", null);
+      if (params.leadType !== "all") query = query.eq("lead_type", params.leadType);
+      if (params.startDate) query = query.gte("created_at", params.startDate);
+      if (params.endDate) query = query.lte("created_at", params.endDate);
     }
-    if (params.memberId) query = query.eq("assigned_member_id", params.memberId);
-    if (params.contactStatusId)
-      query = query.eq("contact_status_id", params.contactStatusId);
-    if (params.meetingStatusId)
-      query = query.eq("meeting_status_id", params.meetingStatusId);
-    if (params.contractStatusId)
-      query = query.eq("contract_status_id", params.contractStatusId);
-    if (params.assignedStatus === "assigned")
-      query = query.not("assigned_member_id", "is", null);
-    else if (params.assignedStatus === "unassigned")
-      query = query.is("assigned_member_id", null);
-    if (params.leadType !== "all") query = query.eq("lead_type", params.leadType);
-    if (params.startDate) query = query.gte("created_at", params.startDate);
-    if (params.endDate) query = query.lte("created_at", params.endDate);
 
     // 정렬
     const validSortColumns = [

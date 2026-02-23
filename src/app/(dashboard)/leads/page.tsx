@@ -536,6 +536,7 @@ export default function LeadsPage() {
         <BulkActionBar
           selectedIds={selectedIds}
           selectedGradeName={selectedGradeName}
+          leadType={leadType}
           onClearSelection={handleClearSelection}
           onActionComplete={handleActionComplete}
         />

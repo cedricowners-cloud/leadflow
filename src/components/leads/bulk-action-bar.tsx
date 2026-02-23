@@ -12,7 +12,7 @@ import {
   SelectLabel,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { X, Users, Tag, Trash2, Check, CircleDashed } from "lucide-react";
+import { X, Users, Tag, Trash2, Check, CircleDashed, Download } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,6 +90,7 @@ interface EligibilityData {
 interface BulkActionBarProps {
   selectedIds: string[];
   selectedGradeName?: string; // 선택된 리드들의 등급명
+  leadType?: string; // 리드 타입 (sales/recruit)
   onClearSelection: () => void;
   onActionComplete: () => void;
 }
@@ -97,6 +98,7 @@ interface BulkActionBarProps {
 export function BulkActionBar({
   selectedIds,
   selectedGradeName,
+  leadType = "sales",
   onClearSelection,
   onActionComplete,
 }: BulkActionBarProps) {
@@ -107,6 +109,7 @@ export function BulkActionBar({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isChangingGrade, setIsChangingGrade] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // 자격자 목록 로드 함수
   const fetchEligibility = useCallback(async (gradeName: string) => {
@@ -310,6 +313,49 @@ export function BulkActionBar({
     }
   };
 
+  // 선택 내보내기
+  const handleSelectedExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("ids", selectedIds.join(","));
+      params.set("leadType", leadType);
+
+      const response = await fetch(`/api/leads/export?${params.toString()}`);
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "내보내기에 실패했습니다");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      const disposition = response.headers.get("Content-Disposition");
+      let fileName = `리드_선택_${new Date().toISOString().split("T")[0]}.xlsx`;
+      if (disposition) {
+        const match = disposition.match(/filename\*=UTF-8''(.+)/);
+        if (match) fileName = decodeURIComponent(match[1]);
+      }
+
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`${selectedIds.length}건의 리드를 내보냈습니다.`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "내보내기에 실패했습니다"
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (selectedIds.length === 0) {
     return null;
   }
@@ -457,6 +503,17 @@ export function BulkActionBar({
             )}
           </SelectContent>
         </Select>
+
+        {/* 선택 내보내기 */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSelectedExport}
+          disabled={isExporting || isAssigning || isChangingGrade || isDeleting}
+        >
+          <Download className="w-4 h-4 mr-1" />
+          {isExporting ? "내보내는 중..." : "내보내기"}
+        </Button>
 
         {/* 일괄 삭제 */}
         <AlertDialog>
