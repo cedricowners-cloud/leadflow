@@ -252,9 +252,65 @@ export default function LeadsPage() {
     setSelectedIds([]);
   };
 
-  // Excel 내보내기 (추후 구현)
-  const handleExport = () => {
-    toast.info("Excel 내보내기 기능은 추후 지원됩니다.");
+  // Excel 내보내기
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("leadType", leadType);
+      if (filters.search) params.set("search", filters.search);
+      if (filters.gradeId) params.set("gradeId", filters.gradeId);
+      if (filters.teamId) params.set("teamId", filters.teamId);
+      if (filters.memberId) params.set("memberId", filters.memberId);
+      if (filters.contactStatusId)
+        params.set("contactStatusId", filters.contactStatusId);
+      if (filters.meetingStatusId)
+        params.set("meetingStatusId", filters.meetingStatusId);
+      if (filters.contractStatusId)
+        params.set("contractStatusId", filters.contractStatusId);
+      if (filters.assignedStatus !== "all")
+        params.set("assignedStatus", filters.assignedStatus);
+      if (filters.startDate)
+        params.set("startDate", filters.startDate.toISOString().split("T")[0]);
+      if (filters.endDate)
+        params.set("endDate", filters.endDate.toISOString().split("T")[0]);
+
+      const response = await fetch(`/api/leads/export?${params.toString()}`);
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "내보내기에 실패했습니다");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      // Content-Disposition에서 파일명 추출
+      const disposition = response.headers.get("Content-Disposition");
+      let fileName = `리드_${new Date().toISOString().split("T")[0]}.xlsx`;
+      if (disposition) {
+        const match = disposition.match(/filename\*=UTF-8''(.+)/);
+        if (match) fileName = decodeURIComponent(match[1]);
+      }
+
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("엑셀 파일이 다운로드되었습니다.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "내보내기에 실패했습니다"
+      );
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -279,9 +335,9 @@ export default function LeadsPage() {
               onOpenChange={handleColumnSettingsOpenChange}
               onSettingsChange={setColumnSettings}
             />
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
             <Download className="mr-2 h-4 w-4" />
-            내보내기
+            {exporting ? "내보내는 중..." : "내보내기"}
           </Button>
           {/* 시스템 관리자만 업로드 버튼 표시 */}
           {currentRole === "system_admin" && (
