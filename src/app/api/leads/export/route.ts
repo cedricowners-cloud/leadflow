@@ -3,6 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import * as XLSX from "xlsx";
 import { z } from "zod";
 
+interface ColumnSetting {
+  column_key: string;
+  column_label: string;
+  is_visible: boolean;
+  display_order: number;
+}
+
 const querySchema = z.object({
   ids: z.string().optional(), // 쉼표 구분 UUID 목록 (선택 내보내기)
   search: z.string().optional(),
@@ -74,6 +81,18 @@ export async function GET(request: NextRequest) {
 
     const params = result.data;
 
+    // 컬럼 설정 조회
+    const { data: columnSettings } = await supabase
+      .from("lead_column_settings")
+      .select("column_key, column_label, is_visible, display_order")
+      .eq("is_visible", true)
+      .order("display_order");
+
+    const visibleColumns: ColumnSetting[] =
+      columnSettings && columnSettings.length > 0
+        ? columnSettings
+        : DEFAULT_COLUMNS;
+
     // 선택된 ID 파싱
     const selectedIds = params.ids
       ? params.ids.split(",").filter((id) => id.trim())
@@ -121,7 +140,7 @@ export async function GET(request: NextRequest) {
             teamMembers.map((m) => m.id)
           );
         } else {
-          return createEmptyExcel(params.leadType);
+          return createEmptyExcel(params.leadType, visibleColumns);
         }
       }
     }
@@ -194,52 +213,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 엑셀 생성
-    const isRecruit = params.leadType === "recruit";
-    const rows = (leads || []).map((lead: Record<string, unknown>) =>
-      isRecruit ? toRecruitRow(lead) : toSalesRow(lead)
-    );
+    // 동적 컬럼 기반 엑셀 행 생성
+    const rows = (leads || []).map((lead: Record<string, unknown>) => {
+      const row: Record<string, string> = {};
+      for (const col of visibleColumns) {
+        row[col.column_label] = getExportCellValue(lead, col.column_key);
+      }
+      return row;
+    });
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
 
-    // 컬럼 너비 설정
-    const colWidths = isRecruit
-      ? [
-          { wch: 10 }, // 이름
-          { wch: 15 }, // 연락처
-          { wch: 25 }, // 이메일
-          { wch: 12 }, // 거주지역
-          { wch: 15 }, // 보험 영업 경력
-          { wch: 15 }, // 법인 영업 경력
-          { wch: 15 }, // 보유 자격
-          { wch: 15 }, // 연락 가능 시간
-          { wch: 20 }, // 캠페인
-          { wch: 12 }, // 담당자
-          { wch: 12 }, // 소속 팀
-          { wch: 18 }, // 등록일
-        ]
-      : [
-          { wch: 8 },  // 등급
-          { wch: 20 }, // 업체명
-          { wch: 10 }, // 대표자
-          { wch: 15 }, // 연락처
-          { wch: 12 }, // 업종
-          { wch: 15 }, // 연매출
-          { wch: 10 }, // 종업원수
-          { wch: 12 }, // 사업자유형
-          { wch: 10 }, // 세금체납
-          { wch: 15 }, // 연락가능시간
-          { wch: 20 }, // 캠페인
-          { wch: 12 }, // 담당자
-          { wch: 12 }, // 소속 팀
-          { wch: 10 }, // 컨택 상태
-          { wch: 10 }, // 미팅 상태
-          { wch: 10 }, // 계약 상태
-          { wch: 18 }, // 등록일
-        ];
-    ws["!cols"] = colWidths;
+    // 컬럼 너비 동적 설정
+    ws["!cols"] = visibleColumns.map((col) => ({
+      wch: getColumnWidth(col.column_key),
+    }));
 
+    const isRecruit = params.leadType === "recruit";
     const sheetName = isRecruit ? "채용 리드" : "영업 리드";
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
@@ -264,8 +255,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 영업 리드 행 변환
-function toSalesRow(lead: Record<string, unknown>) {
+// column_key에 따라 리드 데이터에서 텍스트 값 추출
+function getExportCellValue(lead: Record<string, unknown>, columnKey: string): string {
   const extra = (lead.extra_fields || {}) as Record<string, unknown>;
   const grade = lead.grade as { name?: string } | null;
   const assignedMember = lead.assigned_member as {
@@ -276,55 +267,124 @@ function toSalesRow(lead: Record<string, unknown>) {
   const meetingStatus = lead.meeting_status as { name?: string } | null;
   const contractStatus = lead.contract_status as { name?: string } | null;
 
-  return {
-    등급: grade?.name || "",
-    업체명: (lead.company_name as string) || "",
-    대표자: (lead.representative_name as string) || "",
-    연락처: (lead.phone as string) || "",
-    업종: (lead.industry as string) || "",
-    연매출: formatRevenue(lead),
-    종업원수: formatEmployeeCount(lead),
-    사업자유형: (lead.business_type as string) || "",
-    세금체납: lead.tax_delinquency === true ? "있음" : lead.tax_delinquency === false ? "없음" : "",
-    연락가능시간: (lead.available_time as string) || (extra["연락_가능_시간"] as string) || "",
-    캠페인: (lead.campaign_name as string) || "",
-    담당자: assignedMember?.name || "",
-    소속팀: assignedMember?.team?.name || "",
-    "컨택 상태": contactStatus?.name || "",
-    "미팅 상태": meetingStatus?.name || "",
-    "계약 상태": contractStatus?.name || "",
-    등록일: formatDate(lead.created_at as string),
-  };
+  switch (columnKey) {
+    case "grade":
+      return grade?.name || "";
+
+    case "company_name":
+      return (lead.company_name as string) || "";
+
+    case "representative_name":
+      return (lead.representative_name as string) || "";
+
+    case "phone":
+      return (lead.phone as string) || "";
+
+    case "industry":
+      return (lead.industry as string) || "";
+
+    case "region":
+      return (lead.region as string) || "";
+
+    case "business_type":
+      return (lead.business_type as string) || "";
+
+    case "tax_delinquency":
+      return lead.tax_delinquency === true
+        ? "체납"
+        : lead.tax_delinquency === false
+          ? "정상"
+          : "";
+
+    case "available_time":
+      return (lead.available_time as string) || (extra["연락_가능_시간"] as string) || "";
+
+    case "campaign_name":
+      return (lead.campaign_name as string) || "";
+
+    case "ad_set_name":
+      return (lead.ad_set_name as string) || "";
+
+    case "ad_name":
+      return (lead.ad_name as string) || "";
+
+    case "form_name":
+      return (lead.form_name as string) || "";
+
+    case "platform":
+      return (lead.platform as string) || "";
+
+    case "is_organic":
+      return lead.is_organic === true ? "Y" : lead.is_organic === false ? "N" : "";
+
+    case "annual_revenue":
+      return formatRevenue(lead);
+
+    case "employee_count":
+      return formatEmployeeCount(lead);
+
+    case "assigned_member":
+      if (!assignedMember?.name) return "";
+      return assignedMember.team?.name
+        ? `${assignedMember.name} (${assignedMember.team.name})`
+        : assignedMember.name;
+
+    case "contact_status":
+      return contactStatus?.name || "";
+
+    case "meeting_status":
+      return meetingStatus?.name || "";
+
+    case "contract_status":
+      return contractStatus?.name || "";
+
+    case "source_date":
+      return formatDate(lead.source_date as string);
+
+    case "created_at":
+      return formatDate(lead.created_at as string);
+
+    default:
+      // extra_fields에서 찾기 (동적 필드)
+      if (extra[columnKey] != null) {
+        return String(extra[columnKey]);
+      }
+      // 직접 필드에서 찾기
+      if (lead[columnKey] != null) {
+        return String(lead[columnKey]);
+      }
+      return "";
+  }
 }
 
-// 채용 리드 행 변환
-function toRecruitRow(lead: Record<string, unknown>) {
-  const extra = (lead.extra_fields || {}) as Record<string, unknown>;
-  const assignedMember = lead.assigned_member as {
-    name?: string;
-    team?: { name?: string };
-  } | null;
-
-  return {
-    이름:
-      (extra["full_name"] as string) ||
-      (lead.representative_name as string) ||
-      "",
-    연락처: (lead.phone as string) || "",
-    이메일: (extra["email"] as string) || "",
-    거주지역: (extra["지원자_거주_지역"] as string) || "",
-    "보험 영업 경력": (extra["보험_영업_경력"] as string) || "",
-    "법인 영업 경력": (extra["법인_영업_경력"] as string) || "",
-    "보유 자격": (extra["보유_자격"] as string) || "",
-    "연락 가능 시간":
-      (extra["연락_가능_시간"] as string) ||
-      (lead.available_time as string) ||
-      "",
-    캠페인: (lead.campaign_name as string) || "",
-    담당자: assignedMember?.name || "",
-    소속팀: assignedMember?.team?.name || "",
-    등록일: formatDate(lead.created_at as string),
+// column_key별 추천 너비
+function getColumnWidth(columnKey: string): number {
+  const widthMap: Record<string, number> = {
+    grade: 8,
+    company_name: 20,
+    representative_name: 12,
+    phone: 15,
+    industry: 12,
+    region: 12,
+    business_type: 12,
+    tax_delinquency: 10,
+    available_time: 15,
+    campaign_name: 20,
+    ad_set_name: 18,
+    ad_name: 18,
+    form_name: 18,
+    platform: 10,
+    is_organic: 8,
+    annual_revenue: 15,
+    employee_count: 12,
+    assigned_member: 18,
+    contact_status: 12,
+    meeting_status: 12,
+    contract_status: 12,
+    source_date: 18,
+    created_at: 18,
   };
+  return widthMap[columnKey] || 15;
 }
 
 function formatRevenue(lead: Record<string, unknown>): string {
@@ -357,9 +417,29 @@ function formatDate(dateStr: string | null): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function createEmptyExcel(leadType: string) {
+// DB에서 컬럼 설정을 불러오지 못했을 때 사용하는 기본 컬럼
+const DEFAULT_COLUMNS: ColumnSetting[] = [
+  { column_key: "grade", column_label: "등급", is_visible: true, display_order: 1 },
+  { column_key: "company_name", column_label: "업체명", is_visible: true, display_order: 2 },
+  { column_key: "representative_name", column_label: "대표자", is_visible: true, display_order: 3 },
+  { column_key: "phone", column_label: "연락처", is_visible: true, display_order: 4 },
+  { column_key: "industry", column_label: "업종", is_visible: true, display_order: 5 },
+  { column_key: "annual_revenue", column_label: "연매출", is_visible: true, display_order: 6 },
+  { column_key: "assigned_member", column_label: "담당자", is_visible: true, display_order: 7 },
+  { column_key: "contact_status", column_label: "컨택상태", is_visible: true, display_order: 8 },
+  { column_key: "meeting_status", column_label: "미팅상태", is_visible: true, display_order: 9 },
+  { column_key: "contract_status", column_label: "계약상태", is_visible: true, display_order: 10 },
+  { column_key: "source_date", column_label: "신청일시", is_visible: true, display_order: 11 },
+  { column_key: "created_at", column_label: "등록일", is_visible: true, display_order: 12 },
+];
+
+function createEmptyExcel(leadType: string, columns: ColumnSetting[]) {
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet([]);
+  // 헤더만 있는 빈 시트 생성
+  const headers = columns.map((col) => col.column_label);
+  const ws = XLSX.utils.aoa_to_sheet([headers]);
+  ws["!cols"] = columns.map((col) => ({ wch: getColumnWidth(col.column_key) }));
+
   const sheetName = leadType === "recruit" ? "채용 리드" : "영업 리드";
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
