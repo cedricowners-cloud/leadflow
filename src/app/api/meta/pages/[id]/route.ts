@@ -7,6 +7,7 @@ import { MetaClient } from "@/lib/meta";
 const updatePageSchema = z.object({
   page_name: z.string().min(1).optional(),
   access_token: z.string().min(1).optional(),
+  ad_account_id: z.string().nullable().optional(),
   is_active: z.boolean().optional(),
   sync_interval_minutes: z.number().int().min(5).max(1440).optional(),
 });

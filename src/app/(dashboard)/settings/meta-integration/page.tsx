@@ -67,6 +67,7 @@ interface MetaPage {
   page_id: string;
   page_name: string;
   access_token?: string;
+  ad_account_id?: string | null;
   has_token?: boolean;
   is_active: boolean;
   sync_interval_minutes: number;
@@ -95,6 +96,7 @@ interface PageFormData {
   page_id: string;
   page_name: string;
   access_token: string;
+  ad_account_id: string;
   sync_interval_minutes: number;
 }
 
@@ -109,6 +111,7 @@ const defaultFormData: PageFormData = {
   page_id: "",
   page_name: "",
   access_token: "",
+  ad_account_id: "",
   sync_interval_minutes: 30,
 };
 
@@ -258,10 +261,14 @@ export default function MetaIntegrationPage() {
 
     setSubmitting(true);
     try {
+      const payload = {
+        ...formData,
+        ad_account_id: formData.ad_account_id || undefined,
+      };
       const res = await fetch("/api/meta/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -289,9 +296,10 @@ export default function MetaIntegrationPage() {
 
     setSubmitting(true);
     try {
-      const updateData: Partial<PageFormData> = {
+      const updateData: Record<string, unknown> = {
         page_name: formData.page_name,
         sync_interval_minutes: formData.sync_interval_minutes,
+        ad_account_id: formData.ad_account_id || null,
       };
 
       if (formData.access_token && formData.access_token !== "") {
@@ -462,6 +470,7 @@ export default function MetaIntegrationPage() {
       page_id: page.page_id,
       page_name: page.page_name,
       access_token: "",
+      ad_account_id: page.ad_account_id || "",
       sync_interval_minutes: page.sync_interval_minutes,
     });
     setShowToken(false);
@@ -686,8 +695,13 @@ export default function MetaIntegrationPage() {
                           <TableCell className="font-medium">
                             {page.page_name}
                           </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {page.page_id}
+                          <TableCell>
+                            <div className="font-mono text-sm">{page.page_id}</div>
+                            {page.ad_account_id && (
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                광고계정: {page.ad_account_id}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
                             {page.has_token ? (
@@ -986,6 +1000,20 @@ export default function MetaIntegrationPage() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="ad_account_id">광고 계정 ID (선택)</Label>
+              <Input
+                id="ad_account_id"
+                placeholder="예: act_123456789 또는 123456789"
+                value={formData.ad_account_id}
+                onChange={(e) =>
+                  setFormData({ ...formData, ad_account_id: e.target.value })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                광고 계정 ID를 입력하면 페이지 폼 대신 광고 계정 기반으로 리드를 가져옵니다. 더 많은 리드를 가져올 수 있습니다.
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="sync_interval">동기화 주기 (분)</Label>
               <Input
                 id="sync_interval"
@@ -1078,6 +1106,20 @@ export default function MetaIntegrationPage() {
                   )}
                 </Button>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_ad_account_id">광고 계정 ID (선택)</Label>
+              <Input
+                id="edit_ad_account_id"
+                placeholder="예: act_123456789 또는 123456789"
+                value={formData.ad_account_id}
+                onChange={(e) =>
+                  setFormData({ ...formData, ad_account_id: e.target.value })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                광고 계정 ID를 입력하면 페이지 폼 대신 광고 계정 기반으로 리드를 가져옵니다.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit_sync_interval">동기화 주기 (분)</Label>

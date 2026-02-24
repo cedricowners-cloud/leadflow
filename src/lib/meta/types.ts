@@ -148,6 +148,7 @@ export interface MetaPageConfig {
   page_id: string;
   page_name: string;
   access_token: string;
+  ad_account_id?: string;
   is_active: boolean;
   last_sync_at?: string;
   last_sync_status?: 'success' | 'error';
@@ -161,6 +162,7 @@ export interface MetaPageInput {
   page_id: string;
   page_name: string;
   access_token: string;
+  ad_account_id?: string;
   is_active?: boolean;
   sync_interval_minutes?: number;
 }
@@ -203,6 +205,7 @@ export interface MetaSyncLogEntry {
 export interface MetaClientOptions {
   accessToken: string;
   pageId: string;
+  adAccountId?: string;
   apiVersion?: string;
   timeout?: number;
 }

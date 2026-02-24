@@ -28,6 +28,7 @@ import {
   MetaLeadsResponse,
   MetaAdInfo,
   MetaFetchOptions,
+  MetaPaging,
 } from './types';
 
 const DEFAULT_API_VERSION = 'v21.0';
@@ -267,6 +268,153 @@ export class MetaClient {
         formName: form.name,
         leads: allLeads,
       });
+    }
+
+    return results;
+  }
+
+  // =====================================================
+  // Ad Account API (광고계정 기반 리드 조회)
+  // =====================================================
+
+  /**
+   * 광고계정의 모든 광고(ad) 목록 조회
+   */
+  async getAdsFromAdAccount(
+    adAccountId: string,
+    options: MetaFetchOptions = {}
+  ): Promise<{ id: string; name: string; status: string }[]> {
+    const allAds: { id: string; name: string; status: string }[] = [];
+    let cursor: string | undefined = options.after;
+    let hasMore = true;
+
+    while (hasMore) {
+      const params: Record<string, string> = {
+        fields: 'id,name,status',
+        limit: '100',
+        // leadgen 광고만 필터링은 어려우므로 전체 조회 후 리드 유무로 판별
+      };
+
+      // 날짜 필터: 광고의 created_time이 아닌 리드 필터에서 적용
+      if (cursor) {
+        params.after = cursor;
+      }
+
+      const response = await this.request<{
+        data: { id: string; name: string; status: string }[];
+        paging?: MetaPaging;
+      }>(`/${adAccountId}/ads`, params);
+
+      allAds.push(...(response.data || []));
+
+      if (response.paging?.cursors?.after && response.data?.length > 0) {
+        cursor = response.paging.cursors.after;
+      } else {
+        hasMore = false;
+      }
+
+      await this.delay(100);
+    }
+
+    return allAds;
+  }
+
+  /**
+   * 특정 광고(ad)에서 리드 목록 조회
+   */
+  async getLeadsFromAd(
+    adId: string,
+    options: MetaFetchOptions = {}
+  ): Promise<{ leads: MetaLead[]; nextCursor?: string }> {
+    const params: Record<string, string> = {
+      fields: 'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id,platform,is_organic',
+      limit: String(options.limit || 100),
+    };
+
+    const filters: { field: string; operator: string; value: number }[] = [];
+    if (options.since) {
+      filters.push({
+        field: 'time_created',
+        operator: 'GREATER_THAN',
+        value: Math.floor(new Date(options.since).getTime() / 1000),
+      });
+    }
+    if (options.until) {
+      filters.push({
+        field: 'time_created',
+        operator: 'LESS_THAN',
+        value: Math.floor(new Date(options.until).getTime() / 1000),
+      });
+    }
+    if (filters.length > 0) {
+      params.filtering = JSON.stringify(filters);
+    }
+
+    if (options.after) {
+      params.after = options.after;
+    }
+
+    try {
+      const response = await this.request<MetaLeadsResponse>(
+        `/${adId}/leads`,
+        params
+      );
+
+      return {
+        leads: (response.data || []).map((lead) => ({
+          ...lead,
+          ad_id: lead.ad_id || adId,
+        })),
+        nextCursor: response.paging?.cursors?.after,
+      };
+    } catch {
+      // leadgen이 아닌 광고는 leads 엔드포인트가 없으므로 빈 배열 반환
+      return { leads: [] };
+    }
+  }
+
+  /**
+   * 광고계정의 모든 광고에서 리드 조회 (자동 페이지네이션)
+   */
+  async getAllLeadsFromAdAccount(
+    adAccountId: string,
+    options: MetaFetchOptions = {}
+  ): Promise<{ adId: string; adName: string; leads: MetaLead[] }[]> {
+    const ads = await this.getAdsFromAdAccount(adAccountId, {});
+    const results: { adId: string; adName: string; leads: MetaLead[] }[] = [];
+
+    for (const ad of ads) {
+      const allLeads: MetaLead[] = [];
+      let cursor: string | undefined;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { leads, nextCursor } = await this.getLeadsFromAd(ad.id, {
+          ...options,
+          after: cursor,
+        });
+
+        allLeads.push(...leads);
+
+        if (nextCursor && leads.length > 0) {
+          cursor = nextCursor;
+        } else {
+          hasMore = false;
+        }
+
+        await this.delay(100);
+      }
+
+      if (allLeads.length > 0) {
+        results.push({
+          adId: ad.id,
+          adName: ad.name,
+          leads: allLeads,
+        });
+      }
+
+      // Rate limit protection
+      await this.delay(50);
     }
 
     return results;

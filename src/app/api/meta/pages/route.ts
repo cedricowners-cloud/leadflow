@@ -8,6 +8,7 @@ const createPageSchema = z.object({
   page_id: z.string().min(1, "페이지 ID는 필수입니다"),
   page_name: z.string().min(1, "페이지 이름은 필수입니다"),
   access_token: z.string().min(1, "액세스 토큰은 필수입니다"),
+  ad_account_id: z.string().optional(),
   is_active: z.boolean().default(true),
   sync_interval_minutes: z.number().int().min(5).max(1440).default(60),
 });
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { page_id, page_name, access_token, is_active, sync_interval_minutes } =
+    const { page_id, page_name, access_token, ad_account_id, is_active, sync_interval_minutes } =
       result.data;
 
     // 토큰 검증 (Meta API 호출 테스트)
@@ -151,6 +152,7 @@ export async function POST(request: NextRequest) {
         page_id,
         page_name,
         access_token,
+        ad_account_id: ad_account_id || null,
         is_active,
         sync_interval_minutes,
       })

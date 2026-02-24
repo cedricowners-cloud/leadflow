@@ -176,36 +176,69 @@ export class MetaSyncService {
 
       const until = options.untilDate || undefined;
 
-      // 모든 폼에서 리드 가져오기
-      const formResults = await client.getAllLeadsFromAllForms({
-        since,
-        until,
-        limit: options.maxLeads || 100,
-      });
-
       let totalFetched = 0;
       let totalCreated = 0;
       let totalDuplicated = 0;
       let totalError = 0;
 
-      // 광고 정보 일괄 조회를 위한 ad_id 수집
       const allAdIds: string[] = [];
       const allParsedLeads: ParsedMetaLead[] = [];
+      let sourcesProcessed = 0;
 
-      for (const formResult of formResults) {
-        const parsedLeads = this.parser.parseMetaLeads(
-          formResult.leads,
-          formResult.formName
-        );
+      // 광고계정 ID가 설정된 경우 광고계정 기반으로 리드 조회
+      if (pageConfig.ad_account_id) {
+        const adAccountId = pageConfig.ad_account_id.startsWith('act_')
+          ? pageConfig.ad_account_id
+          : `act_${pageConfig.ad_account_id}`;
 
-        for (const lead of parsedLeads) {
-          if (lead.ad_id) {
-            allAdIds.push(lead.ad_id);
+        const adResults = await client.getAllLeadsFromAdAccount(adAccountId, {
+          since,
+          until,
+          limit: options.maxLeads || 100,
+        });
+
+        for (const adResult of adResults) {
+          const parsedLeads = this.parser.parseMetaLeads(
+            adResult.leads,
+            adResult.adName
+          );
+
+          for (const lead of parsedLeads) {
+            if (lead.ad_id) {
+              allAdIds.push(lead.ad_id);
+            }
           }
+
+          allParsedLeads.push(...parsedLeads);
+          totalFetched += adResult.leads.length;
         }
 
-        allParsedLeads.push(...parsedLeads);
-        totalFetched += formResult.leads.length;
+        sourcesProcessed = adResults.length;
+      } else {
+        // 기존 방식: 페이지 폼 기반으로 리드 조회
+        const formResults = await client.getAllLeadsFromAllForms({
+          since,
+          until,
+          limit: options.maxLeads || 100,
+        });
+
+        for (const formResult of formResults) {
+          const parsedLeads = this.parser.parseMetaLeads(
+            formResult.leads,
+            formResult.formName
+          );
+
+          for (const lead of parsedLeads) {
+            if (lead.ad_id) {
+              allAdIds.push(lead.ad_id);
+            }
+          }
+
+          allParsedLeads.push(...parsedLeads);
+          totalFetched += formResult.leads.length;
+        }
+
+        sourcesProcessed = formResults.length;
       }
 
       // 광고 정보 일괄 조회
@@ -244,7 +277,7 @@ export class MetaSyncService {
         leads_created: totalCreated,
         leads_duplicated: totalDuplicated,
         leads_error: totalError,
-        forms_processed: formResults.length,
+        forms_processed: sourcesProcessed,
         started_at: startedAt,
         completed_at: new Date().toISOString(),
       };
