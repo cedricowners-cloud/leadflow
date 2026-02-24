@@ -18,6 +18,7 @@ import {
   Settings,
   AlertCircle,
   Calendar,
+  Download,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -107,6 +115,14 @@ interface AppSettings {
   updated_at?: string;
 }
 
+interface AdAccount {
+  id: string; // "act_123456789"
+  account_id: string; // "123456789"
+  name: string;
+  currency?: string;
+  business_name?: string;
+}
+
 const defaultFormData: PageFormData = {
   page_id: "",
   page_name: "",
@@ -140,6 +156,10 @@ export default function MetaIntegrationPage() {
   // Sync date range
   const [syncStartDate, setSyncStartDate] = useState("");
   const [syncEndDate, setSyncEndDate] = useState("");
+
+  // Ad accounts
+  const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
+  const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
 
   // Handle URL params (success/error from OAuth callback)
   useEffect(() => {
@@ -193,6 +213,32 @@ export default function MetaIntegrationPage() {
       setAppSettings(data.data || null);
     } catch (error) {
       console.error("Failed to fetch app settings:", error);
+    }
+  }, []);
+
+  // Fetch ad accounts
+  const fetchAdAccounts = useCallback(async () => {
+    setLoadingAdAccounts(true);
+    try {
+      const res = await fetch("/api/meta/ad-accounts");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to fetch ad accounts");
+      }
+      const data = await res.json();
+      setAdAccounts(data.ad_accounts || []);
+      if (data.ad_accounts?.length > 0) {
+        toast.success(`${data.ad_accounts.length}개 광고 계정을 불러왔습니다.`);
+      } else {
+        toast.info("연결된 광고 계정이 없습니다.");
+      }
+    } catch (error) {
+      console.error("Failed to fetch ad accounts:", error);
+      toast.error(
+        error instanceof Error ? error.message : "광고 계정을 불러오는데 실패했습니다."
+      );
+    } finally {
+      setLoadingAdAccounts(false);
     }
   }, []);
 
@@ -1000,17 +1046,49 @@ export default function MetaIntegrationPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ad_account_id">광고 계정 ID (선택)</Label>
-              <Input
-                id="ad_account_id"
-                placeholder="예: act_123456789 또는 123456789"
-                value={formData.ad_account_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, ad_account_id: e.target.value })
-                }
-              />
+              <Label>광고 계정 (선택)</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.ad_account_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, ad_account_id: value === "__none__" ? "" : value })
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="광고 계정을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">선택 안함</SelectItem>
+                    {adAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name} ({account.id})
+                        {account.business_name && ` - ${account.business_name}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchAdAccounts}
+                  disabled={loadingAdAccounts}
+                  className="flex-shrink-0"
+                >
+                  {loadingAdAccounts ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+              {adAccounts.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  &quot;불러오기&quot; 버튼을 클릭하여 Facebook 광고 계정 목록을 가져오세요.
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
-                광고 계정 ID를 입력하면 페이지 폼 대신 광고 계정 기반으로 리드를 가져옵니다. 더 많은 리드를 가져올 수 있습니다.
+                광고 계정을 선택하면 페이지 폼 대신 광고 계정 기반으로 리드를 가져옵니다.
               </p>
             </div>
             <div className="space-y-2">
@@ -1108,17 +1186,49 @@ export default function MetaIntegrationPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit_ad_account_id">광고 계정 ID (선택)</Label>
-              <Input
-                id="edit_ad_account_id"
-                placeholder="예: act_123456789 또는 123456789"
-                value={formData.ad_account_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, ad_account_id: e.target.value })
-                }
-              />
+              <Label>광고 계정 (선택)</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.ad_account_id || "__none__"}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, ad_account_id: value === "__none__" ? "" : value })
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="광고 계정을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">선택 안함</SelectItem>
+                    {adAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name} ({account.id})
+                        {account.business_name && ` - ${account.business_name}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchAdAccounts}
+                  disabled={loadingAdAccounts}
+                  className="flex-shrink-0"
+                >
+                  {loadingAdAccounts ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+              {adAccounts.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  &quot;불러오기&quot; 버튼을 클릭하여 Facebook 광고 계정 목록을 가져오세요.
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
-                광고 계정 ID를 입력하면 페이지 폼 대신 광고 계정 기반으로 리드를 가져옵니다.
+                광고 계정을 선택하면 페이지 폼 대신 광고 계정 기반으로 리드를 가져옵니다.
               </p>
             </div>
             <div className="space-y-2">

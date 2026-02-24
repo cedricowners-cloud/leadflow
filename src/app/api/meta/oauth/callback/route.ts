@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     // Meta 앱 설정 조회
     const { data: appSettings } = await supabase
       .from("meta_app_settings")
-      .select("app_id, app_secret")
+      .select("id, app_id, app_secret")
       .single();
 
     if (!appSettings?.app_id || !appSettings?.app_secret) {
@@ -77,20 +77,33 @@ export async function GET(request: NextRequest) {
     const redirectUri = `${baseUrl}/api/meta/oauth/callback`;
 
     // OAuth 플로우 완료 (코드 → 토큰 교환 → 페이지 목록)
-    const { pages } = await completeOAuthFlow(code, {
+    const { userToken, pages } = await completeOAuthFlow(code, {
       appId: appSettings.app_id,
       appSecret: appSettings.app_secret,
       redirectUri,
     });
+
+    // Admin 클라이언트로 데이터 저장 (RLS 우회)
+    const adminClient = createAdminClient();
+
+    // User Access Token 저장 (광고 계정 조회 등에 사용)
+    // Long-lived token은 약 60일 유효
+    await adminClient
+      .from("meta_app_settings")
+      .update({
+        user_access_token: userToken,
+        user_token_expires_at: new Date(
+          Date.now() + 60 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", appSettings.id);
 
     if (pages.length === 0) {
       return NextResponse.redirect(
         `${settingsUrl}?error=${encodeURIComponent("연결된 Facebook 페이지가 없습니다. 페이지 관리자 권한이 있는지 확인해주세요.")}`
       );
     }
-
-    // Admin 클라이언트로 페이지 저장 (RLS 우회)
-    const adminClient = createAdminClient();
 
     // 기존 페이지 조회
     const { data: existingPages } = await adminClient
