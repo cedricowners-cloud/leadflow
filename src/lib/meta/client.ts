@@ -188,15 +188,24 @@ export class MetaClient {
       limit: String(options.limit || 100),
     };
 
+    // 날짜 필터링 (since: 이후, until: 이전)
+    const filters: { field: string; operator: string; value: number }[] = [];
     if (options.since) {
-      // Convert ISO date to Unix timestamp
-      params.filtering = JSON.stringify([
-        {
-          field: 'time_created',
-          operator: 'GREATER_THAN',
-          value: Math.floor(new Date(options.since).getTime() / 1000),
-        },
-      ]);
+      filters.push({
+        field: 'time_created',
+        operator: 'GREATER_THAN',
+        value: Math.floor(new Date(options.since).getTime() / 1000),
+      });
+    }
+    if (options.until) {
+      filters.push({
+        field: 'time_created',
+        operator: 'LESS_THAN',
+        value: Math.floor(new Date(options.until).getTime() / 1000),
+      });
+    }
+    if (filters.length > 0) {
+      params.filtering = JSON.stringify(filters);
     }
 
     if (options.after) {

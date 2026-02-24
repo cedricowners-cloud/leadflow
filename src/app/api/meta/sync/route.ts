@@ -36,9 +36,11 @@ export async function POST(request: NextRequest) {
 
     // 요청 바디 파싱
     const body = await request.json().catch(() => ({}));
-    const { page_id, force_full_sync } = body as {
+    const { page_id, force_full_sync, since_date, until_date } = body as {
       page_id?: string;
       force_full_sync?: boolean;
+      since_date?: string;
+      until_date?: string;
     };
 
     // Admin 클라이언트로 동기화 서비스 생성 (RLS 우회)
@@ -47,21 +49,24 @@ export async function POST(request: NextRequest) {
 
     let results;
 
+    // 날짜 범위가 지정된 경우 증분 동기화 대신 날짜 범위 사용
+    const hasDateRange = !!(since_date || until_date);
+
+    const syncOptions = {
+      syncType: "manual" as const,
+      forceFullSync: force_full_sync,
+      incrementalSync: hasDateRange ? false : !force_full_sync,
+      sinceDate: since_date,
+      untilDate: until_date,
+    };
+
     if (page_id) {
       // 특정 페이지만 동기화
-      const result = await syncService.syncPage(page_id, {
-        syncType: "manual",
-        forceFullSync: force_full_sync,
-        incrementalSync: !force_full_sync,
-      });
+      const result = await syncService.syncPage(page_id, syncOptions);
       results = [result];
     } else {
       // 모든 활성 페이지 동기화
-      results = await syncService.syncAllPages({
-        syncType: "manual",
-        forceFullSync: force_full_sync,
-        incrementalSync: !force_full_sync,
-      });
+      results = await syncService.syncAllPages(syncOptions);
     }
 
     // 결과 요약

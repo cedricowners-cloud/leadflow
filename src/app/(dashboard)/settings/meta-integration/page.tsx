@@ -17,6 +17,7 @@ import {
   Link as LinkIcon,
   Settings,
   AlertCircle,
+  Calendar,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -132,6 +133,10 @@ export default function MetaIntegrationPage() {
   const [showToken, setShowToken] = useState(false);
   const [showAppSecret, setShowAppSecret] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Sync date range
+  const [syncStartDate, setSyncStartDate] = useState("");
+  const [syncEndDate, setSyncEndDate] = useState("");
 
   // Handle URL params (success/error from OAuth callback)
   useEffect(() => {
@@ -376,10 +381,14 @@ export default function MetaIntegrationPage() {
   const handleSyncPage = async (pageId: string) => {
     setSyncing(pageId);
     try {
+      const body: Record<string, string | boolean> = { page_id: pageId };
+      if (syncStartDate) body.since_date = syncStartDate;
+      if (syncEndDate) body.until_date = syncEndDate;
+
       const res = await fetch("/api/meta/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page_id: pageId }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -412,10 +421,14 @@ export default function MetaIntegrationPage() {
   const handleSyncAll = async () => {
     setSyncingAll(true);
     try {
+      const body: Record<string, string> = {};
+      if (syncStartDate) body.since_date = syncStartDate;
+      if (syncEndDate) body.until_date = syncEndDate;
+
       const res = await fetch("/api/meta/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -599,6 +612,47 @@ export default function MetaIntegrationPage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {/* 동기화 날짜 범위 선택 */}
+                {pages.length > 0 && (
+                  <div className="flex items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg">
+                    <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm text-muted-foreground flex-shrink-0">동기화 기간:</span>
+                    <Input
+                      type="date"
+                      value={syncStartDate}
+                      onChange={(e) => setSyncStartDate(e.target.value)}
+                      className="w-40 h-8 text-sm"
+                      placeholder="시작일"
+                    />
+                    <span className="text-sm text-muted-foreground">~</span>
+                    <Input
+                      type="date"
+                      value={syncEndDate}
+                      onChange={(e) => setSyncEndDate(e.target.value)}
+                      className="w-40 h-8 text-sm"
+                      placeholder="종료일"
+                    />
+                    {(syncStartDate || syncEndDate) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          setSyncStartDate("");
+                          setSyncEndDate("");
+                        }}
+                      >
+                        초기화
+                      </Button>
+                    )}
+                    {!syncStartDate && !syncEndDate && (
+                      <span className="text-xs text-muted-foreground">
+                        미선택 시 마지막 동기화 이후 데이터를 가져옵니다
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

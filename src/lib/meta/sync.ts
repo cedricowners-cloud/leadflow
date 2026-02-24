@@ -40,6 +40,10 @@ export interface SyncOptions {
   maxLeads?: number;
   /** 동기화 타입 */
   syncType?: 'manual' | 'scheduled' | 'webhook';
+  /** 사용자 지정 시작 날짜 (ISO 8601) — 이 날짜 이후 리드만 가져옴 */
+  sinceDate?: string;
+  /** 사용자 지정 종료 날짜 (ISO 8601) — 이 날짜 이전 리드만 가져옴 */
+  untilDate?: string;
 }
 
 /** 리드 타입 */
@@ -163,15 +167,19 @@ export class MetaSyncService {
         pageId: pageConfig.page_id,
       });
 
-      // 마지막 동기화 시간 (증분 동기화용)
-      const since =
-        options.incrementalSync && pageConfig.last_sync_at && !options.forceFullSync
+      // 날짜 범위 결정: 사용자 지정 날짜 > 증분 동기화 > 전체 동기화
+      const since = options.sinceDate
+        ? options.sinceDate
+        : options.incrementalSync && pageConfig.last_sync_at && !options.forceFullSync
           ? pageConfig.last_sync_at
           : undefined;
+
+      const until = options.untilDate || undefined;
 
       // 모든 폼에서 리드 가져오기
       const formResults = await client.getAllLeadsFromAllForms({
         since,
+        until,
         limit: options.maxLeads || 100,
       });
 
