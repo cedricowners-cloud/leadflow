@@ -177,8 +177,14 @@ export async function GET(request: NextRequest) {
       else if (params.assignedStatus === "unassigned")
         query = query.is("assigned_member_id", null);
       if (params.leadType !== "all") query = query.eq("lead_type", params.leadType);
-      if (params.startDate) query = query.gte("created_at", params.startDate);
-      if (params.endDate) query = query.lte("created_at", params.endDate);
+      if (params.startDate) {
+        const kstStart = `${params.startDate}T00:00:00+09:00`;
+        query = query.gte("source_date", kstStart);
+      }
+      if (params.endDate) {
+        const kstEnd = `${params.endDate}T23:59:59+09:00`;
+        query = query.lte("source_date", kstEnd);
+      }
     }
 
     // 정렬

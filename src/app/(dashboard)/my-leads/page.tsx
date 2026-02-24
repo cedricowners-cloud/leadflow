@@ -63,10 +63,14 @@ export default function MyLeadsPage() {
         params.set("meetingStatusId", filters.meetingStatusId);
       if (filters.contractStatusId)
         params.set("contractStatusId", filters.contractStatusId);
-      if (filters.startDate)
-        params.set("startDate", filters.startDate.toISOString().split("T")[0]);
-      if (filters.endDate)
-        params.set("endDate", filters.endDate.toISOString().split("T")[0]);
+      if (filters.startDate) {
+        const d = filters.startDate;
+        params.set("startDate", `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+      }
+      if (filters.endDate) {
+        const d = filters.endDate;
+        params.set("endDate", `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+      }
 
       const response = await fetch(`/api/leads?${params.toString()}`);
       const result = await response.json();

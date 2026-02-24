@@ -205,12 +205,14 @@ export async function GET(request: NextRequest) {
       query = query.eq("lead_type", leadType);
     }
 
-    // 날짜 필터
+    // 날짜 필터 (신청일 source_date 기준, KST 타임존 적용)
     if (startDate) {
-      query = query.gte("created_at", startDate);
+      const kstStart = `${startDate}T00:00:00+09:00`;
+      query = query.gte("source_date", kstStart);
     }
     if (endDate) {
-      query = query.lte("created_at", endDate);
+      const kstEnd = `${endDate}T23:59:59+09:00`;
+      query = query.lte("source_date", kstEnd);
     }
 
     // 정렬
