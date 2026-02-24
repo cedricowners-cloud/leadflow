@@ -7,7 +7,9 @@ import { createMetaSyncService } from "@/lib/meta";
  * POST /api/meta/sync - 수동 동기화 트리거
  *
  * 요청 본문:
- * - page_id (선택): 특정 페이지만 동기화. 없으면 모든 활성 페이지 동기화
+ * - page_id (선택): 특정 페이지만 동기화
+ * - ad_account_id (선택): 특정 광고 계정만 동기화
+ * - page_id, ad_account_id 둘 다 없으면 모든 활성 페이지 + 광고 계정 동기화
  * - force_full_sync (선택): true면 증분 동기화 대신 전체 동기화
  */
 export async function POST(request: NextRequest) {
@@ -36,18 +38,18 @@ export async function POST(request: NextRequest) {
 
     // 요청 바디 파싱
     const body = await request.json().catch(() => ({}));
-    const { page_id, force_full_sync, since_date, until_date } = body as {
-      page_id?: string;
-      force_full_sync?: boolean;
-      since_date?: string;
-      until_date?: string;
-    };
+    const { page_id, ad_account_id, force_full_sync, since_date, until_date } =
+      body as {
+        page_id?: string;
+        ad_account_id?: string;
+        force_full_sync?: boolean;
+        since_date?: string;
+        until_date?: string;
+      };
 
     // Admin 클라이언트로 동기화 서비스 생성 (RLS 우회)
     const adminClient = createAdminClient();
     const syncService = createMetaSyncService(adminClient);
-
-    let results;
 
     // 날짜 범위가 지정된 경우 증분 동기화 대신 날짜 범위 사용
     const hasDateRange = !!(since_date || until_date);
@@ -60,33 +62,56 @@ export async function POST(request: NextRequest) {
       untilDate: until_date,
     };
 
-    if (page_id) {
+    let pageResults: Awaited<ReturnType<typeof syncService.syncPage>>[] = [];
+    let adAccountResults: Awaited<
+      ReturnType<typeof syncService.syncAdAccount>
+    >[] = [];
+
+    if (ad_account_id) {
+      // 특정 광고 계정만 동기화
+      const result = await syncService.syncAdAccount(
+        ad_account_id,
+        syncOptions
+      );
+      adAccountResults = [result];
+    } else if (page_id) {
       // 특정 페이지만 동기화
       const result = await syncService.syncPage(page_id, syncOptions);
-      results = [result];
+      pageResults = [result];
     } else {
-      // 모든 활성 페이지 동기화
-      results = await syncService.syncAllPages(syncOptions);
+      // 모든 활성 페이지 + 광고 계정 동기화
+      pageResults = await syncService.syncAllPages(syncOptions);
+      adAccountResults = await syncService.syncAllAdAccounts(syncOptions);
     }
+
+    const allResults = [...pageResults, ...adAccountResults];
 
     // 결과 요약
     const summary = {
-      total_pages: results.length,
-      successful_pages: results.filter((r) => r.success).length,
-      failed_pages: results.filter((r) => !r.success).length,
-      total_leads_fetched: results.reduce((sum, r) => sum + r.leads_fetched, 0),
-      total_leads_created: results.reduce((sum, r) => sum + r.leads_created, 0),
-      total_leads_duplicated: results.reduce(
+      total_sources: allResults.length,
+      total_pages: pageResults.length,
+      total_ad_accounts: adAccountResults.length,
+      successful: allResults.filter((r) => r.success).length,
+      failed: allResults.filter((r) => !r.success).length,
+      total_leads_fetched: allResults.reduce(
+        (sum, r) => sum + r.leads_fetched,
+        0
+      ),
+      total_leads_created: allResults.reduce(
+        (sum, r) => sum + r.leads_created,
+        0
+      ),
+      total_leads_duplicated: allResults.reduce(
         (sum, r) => sum + r.leads_duplicated,
         0
       ),
     };
 
     return NextResponse.json({
-      success: summary.failed_pages === 0,
+      success: summary.failed === 0,
       data: {
         summary,
-        results,
+        results: allResults,
       },
     });
   } catch (error) {
@@ -129,20 +154,32 @@ export async function GET(request: NextRequest) {
     const adminClient = createAdminClient();
     const syncService = createMetaSyncService(adminClient);
 
-    // 모든 활성 페이지 증분 동기화
-    const results = await syncService.syncAllPages({
-      syncType: "scheduled",
+    const cronOptions = {
+      syncType: "scheduled" as const,
       incrementalSync: true,
-    });
+    };
+
+    // 모든 활성 페이지 + 광고 계정 증분 동기화
+    const pageResults = await syncService.syncAllPages(cronOptions);
+    const adAccountResults = await syncService.syncAllAdAccounts(cronOptions);
+    const allResults = [...pageResults, ...adAccountResults];
 
     // 결과 요약
     const summary = {
-      total_pages: results.length,
-      successful_pages: results.filter((r) => r.success).length,
-      failed_pages: results.filter((r) => !r.success).length,
-      total_leads_fetched: results.reduce((sum, r) => sum + r.leads_fetched, 0),
-      total_leads_created: results.reduce((sum, r) => sum + r.leads_created, 0),
-      total_leads_duplicated: results.reduce(
+      total_sources: allResults.length,
+      total_pages: pageResults.length,
+      total_ad_accounts: adAccountResults.length,
+      successful: allResults.filter((r) => r.success).length,
+      failed: allResults.filter((r) => !r.success).length,
+      total_leads_fetched: allResults.reduce(
+        (sum, r) => sum + r.leads_fetched,
+        0
+      ),
+      total_leads_created: allResults.reduce(
+        (sum, r) => sum + r.leads_created,
+        0
+      ),
+      total_leads_duplicated: allResults.reduce(
         (sum, r) => sum + r.leads_duplicated,
         0
       ),
@@ -151,10 +188,10 @@ export async function GET(request: NextRequest) {
     console.log("Cron sync completed:", summary);
 
     return NextResponse.json({
-      success: summary.failed_pages === 0,
+      success: summary.failed === 0,
       data: {
         summary,
-        results,
+        results: allResults,
       },
     });
   } catch (error) {

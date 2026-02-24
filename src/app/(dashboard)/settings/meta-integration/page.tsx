@@ -57,13 +57,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -75,7 +68,6 @@ interface MetaPage {
   page_id: string;
   page_name: string;
   access_token?: string;
-  ad_account_id?: string | null;
   has_token?: boolean;
   is_active: boolean;
   sync_interval_minutes: number;
@@ -88,7 +80,8 @@ interface MetaPage {
 
 interface SyncLog {
   id: string;
-  page_id: string;
+  page_id: string | null;
+  ad_account_id: string | null;
   sync_type: string;
   status: string;
   leads_fetched: number;
@@ -98,13 +91,13 @@ interface SyncLog {
   started_at: string;
   completed_at: string | null;
   meta_pages?: { page_name: string };
+  meta_ad_accounts?: { account_name: string };
 }
 
 interface PageFormData {
   page_id: string;
   page_name: string;
   access_token: string;
-  ad_account_id: string;
   sync_interval_minutes: number;
 }
 
@@ -115,7 +108,8 @@ interface AppSettings {
   updated_at?: string;
 }
 
-interface AdAccount {
+// Meta API에서 불러온 광고 계정 (저장 전)
+interface MetaAdAccount {
   id: string; // "act_123456789"
   account_id: string; // "123456789"
   name: string;
@@ -123,11 +117,26 @@ interface AdAccount {
   business_name?: string;
 }
 
+// DB에 저장된 광고 계정
+interface SavedAdAccount {
+  id: string;
+  ad_account_id: string;
+  account_name: string | null;
+  currency: string | null;
+  business_name: string | null;
+  is_active: boolean;
+  sync_interval_minutes: number;
+  last_sync_at: string | null;
+  last_sync_status: "success" | "error" | null;
+  last_sync_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const defaultFormData: PageFormData = {
   page_id: "",
   page_name: "",
   access_token: "",
-  ad_account_id: "",
   sync_interval_minutes: 30,
 };
 
@@ -157,9 +166,16 @@ export default function MetaIntegrationPage() {
   const [syncStartDate, setSyncStartDate] = useState("");
   const [syncEndDate, setSyncEndDate] = useState("");
 
-  // Ad accounts
-  const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
-  const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
+  // Ad accounts (from Meta API)
+  const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[]>([]);
+  const [loadingMetaAdAccounts, setLoadingMetaAdAccounts] = useState(false);
+
+  // Saved ad accounts (from DB)
+  const [savedAdAccounts, setSavedAdAccounts] = useState<SavedAdAccount[]>([]);
+  const [syncingAdAccount, setSyncingAdAccount] = useState<string | null>(null);
+  const [syncingAllAdAccounts, setSyncingAllAdAccounts] = useState(false);
+  const [isDeleteAdAccountDialogOpen, setIsDeleteAdAccountDialogOpen] = useState(false);
+  const [selectedAdAccount, setSelectedAdAccount] = useState<SavedAdAccount | null>(null);
 
   // Handle URL params (success/error from OAuth callback)
   useEffect(() => {
@@ -216,9 +232,9 @@ export default function MetaIntegrationPage() {
     }
   }, []);
 
-  // Fetch ad accounts
-  const fetchAdAccounts = useCallback(async () => {
-    setLoadingAdAccounts(true);
+  // Fetch ad accounts from Meta API
+  const fetchMetaAdAccounts = useCallback(async () => {
+    setLoadingMetaAdAccounts(true);
     try {
       const res = await fetch("/api/meta/ad-accounts");
       if (!res.ok) {
@@ -226,7 +242,7 @@ export default function MetaIntegrationPage() {
         throw new Error(data.error || "Failed to fetch ad accounts");
       }
       const data = await res.json();
-      setAdAccounts(data.ad_accounts || []);
+      setMetaAdAccounts(data.ad_accounts || []);
       if (data.ad_accounts?.length > 0) {
         toast.success(`${data.ad_accounts.length}개 광고 계정을 불러왔습니다.`);
       } else {
@@ -238,18 +254,30 @@ export default function MetaIntegrationPage() {
         error instanceof Error ? error.message : "광고 계정을 불러오는데 실패했습니다."
       );
     } finally {
-      setLoadingAdAccounts(false);
+      setLoadingMetaAdAccounts(false);
+    }
+  }, []);
+
+  // Fetch saved ad accounts from DB
+  const fetchSavedAdAccounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/meta/ad-accounts/saved");
+      if (!res.ok) throw new Error("Failed to fetch saved ad accounts");
+      const data = await res.json();
+      setSavedAdAccounts(data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch saved ad accounts:", error);
     }
   }, []);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchPages(), fetchSyncLogs(), fetchAppSettings()]);
+      await Promise.all([fetchPages(), fetchSyncLogs(), fetchAppSettings(), fetchSavedAdAccounts()]);
       setLoading(false);
     };
     loadData();
-  }, [fetchPages, fetchSyncLogs, fetchAppSettings]);
+  }, [fetchPages, fetchSyncLogs, fetchAppSettings, fetchSavedAdAccounts]);
 
   // Save app settings
   const handleSaveAppSettings = async () => {
@@ -307,14 +335,10 @@ export default function MetaIntegrationPage() {
 
     setSubmitting(true);
     try {
-      const payload = {
-        ...formData,
-        ad_account_id: formData.ad_account_id || undefined,
-      };
       const res = await fetch("/api/meta/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formData),
       });
 
       if (!res.ok) {
@@ -345,7 +369,6 @@ export default function MetaIntegrationPage() {
       const updateData: Record<string, unknown> = {
         page_name: formData.page_name,
         sync_interval_minutes: formData.sync_interval_minutes,
-        ad_account_id: formData.ad_account_id || null,
       };
 
       if (formData.access_token && formData.access_token !== "") {
@@ -516,7 +539,6 @@ export default function MetaIntegrationPage() {
       page_id: page.page_id,
       page_name: page.page_name,
       access_token: "",
-      ad_account_id: page.ad_account_id || "",
       sync_interval_minutes: page.sync_interval_minutes,
     });
     setShowToken(false);
@@ -527,6 +549,189 @@ export default function MetaIntegrationPage() {
   const openDeleteDialog = (page: MetaPage) => {
     setSelectedPage(page);
     setIsDeleteDialogOpen(true);
+  };
+
+  // Save ad account to DB
+  const handleSaveAdAccount = async (account: MetaAdAccount) => {
+    try {
+      const res = await fetch("/api/meta/ad-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ad_account_id: account.id,
+          account_name: account.name,
+          currency: account.currency,
+          business_name: account.business_name,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to save ad account");
+      }
+
+      toast.success(`광고 계정 "${account.name}"이(가) 저장되었습니다.`);
+      await fetchSavedAdAccounts();
+    } catch (error) {
+      console.error("Failed to save ad account:", error);
+      toast.error(
+        error instanceof Error ? error.message : "광고 계정 저장에 실패했습니다."
+      );
+    }
+  };
+
+  // Delete ad account
+  const handleDeleteAdAccount = async () => {
+    if (!selectedAdAccount) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/meta/ad-accounts/${selectedAdAccount.id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to delete ad account");
+      }
+
+      toast.success("광고 계정이 삭제되었습니다.");
+      setIsDeleteAdAccountDialogOpen(false);
+      setSelectedAdAccount(null);
+      await fetchSavedAdAccounts();
+    } catch (error) {
+      console.error("Failed to delete ad account:", error);
+      toast.error(
+        error instanceof Error ? error.message : "광고 계정 삭제에 실패했습니다."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Toggle ad account active status
+  const handleToggleAdAccountActive = async (account: SavedAdAccount) => {
+    try {
+      const res = await fetch(`/api/meta/ad-accounts/${account.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: !account.is_active }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to toggle ad account status");
+      }
+
+      toast.success(
+        account.is_active ? "광고 계정이 비활성화되었습니다." : "광고 계정이 활성화되었습니다."
+      );
+      await fetchSavedAdAccounts();
+    } catch (error) {
+      console.error("Failed to toggle ad account status:", error);
+      toast.error("상태 변경에 실패했습니다.");
+    }
+  };
+
+  // Sync single ad account
+  const handleSyncAdAccount = async (adAccountId: string) => {
+    setSyncingAdAccount(adAccountId);
+    try {
+      const body: Record<string, string | boolean> = { ad_account_id: adAccountId };
+      if (syncStartDate) body.since_date = syncStartDate;
+      if (syncEndDate) body.until_date = syncEndDate;
+
+      const res = await fetch("/api/meta/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Sync failed");
+      }
+
+      const result = data.data?.results?.[0];
+      if (result?.success) {
+        toast.success(
+          `동기화 완료: ${result.leads_created}건 생성, ${result.leads_duplicated}건 중복`
+        );
+      } else {
+        toast.error(`동기화 실패: ${result?.error || "Unknown error"}`);
+      }
+
+      await Promise.all([fetchSavedAdAccounts(), fetchSyncLogs()]);
+    } catch (error) {
+      console.error("Ad account sync failed:", error);
+      toast.error(
+        error instanceof Error ? error.message : "동기화에 실패했습니다."
+      );
+    } finally {
+      setSyncingAdAccount(null);
+    }
+  };
+
+  // Sync all ad accounts
+  const handleSyncAllAdAccounts = async () => {
+    setSyncingAllAdAccounts(true);
+    try {
+      // Sync only ad accounts by sending each one individually
+      const activeAccounts = savedAdAccounts.filter((a) => a.is_active);
+      if (activeAccounts.length === 0) {
+        toast.info("활성화된 광고 계정이 없습니다.");
+        return;
+      }
+
+      let totalCreated = 0;
+      let totalDuplicated = 0;
+      let failedCount = 0;
+
+      for (const account of activeAccounts) {
+        try {
+          const body: Record<string, string | boolean> = { ad_account_id: account.id };
+          if (syncStartDate) body.since_date = syncStartDate;
+          if (syncEndDate) body.until_date = syncEndDate;
+
+          const res = await fetch("/api/meta/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          const data = await res.json();
+          const result = data.data?.results?.[0];
+          if (result?.success) {
+            totalCreated += result.leads_created;
+            totalDuplicated += result.leads_duplicated;
+          } else {
+            failedCount++;
+          }
+        } catch {
+          failedCount++;
+        }
+      }
+
+      if (failedCount === 0) {
+        toast.success(
+          `전체 동기화 완료: ${totalCreated}건 생성, ${totalDuplicated}건 중복`
+        );
+      } else {
+        toast.warning(
+          `동기화 완료 (${failedCount}건 실패): ${totalCreated}건 생성, ${totalDuplicated}건 중복`
+        );
+      }
+
+      await Promise.all([fetchSavedAdAccounts(), fetchSyncLogs()]);
+    } catch (error) {
+      console.error("Sync all ad accounts failed:", error);
+      toast.error(
+        error instanceof Error ? error.message : "전체 동기화에 실패했습니다."
+      );
+    } finally {
+      setSyncingAllAdAccounts(false);
+    }
   };
 
   // Format date
@@ -575,6 +780,7 @@ export default function MetaIntegrationPage() {
         <Tabs defaultValue="pages" className="w-full">
           <TabsList>
             <TabsTrigger value="pages">페이지 관리</TabsTrigger>
+            <TabsTrigger value="ad-accounts">광고 계정</TabsTrigger>
             <TabsTrigger value="logs">동기화 로그</TabsTrigger>
             <TabsTrigger value="settings">앱 설정</TabsTrigger>
           </TabsList>
@@ -743,11 +949,6 @@ export default function MetaIntegrationPage() {
                           </TableCell>
                           <TableCell>
                             <div className="font-mono text-sm">{page.page_id}</div>
-                            {page.ad_account_id && (
-                              <div className="text-xs text-muted-foreground mt-0.5">
-                                광고계정: {page.ad_account_id}
-                              </div>
-                            )}
                           </TableCell>
                           <TableCell>
                             {page.has_token ? (
@@ -812,6 +1013,236 @@ export default function MetaIntegrationPage() {
             </Card>
           </TabsContent>
 
+          {/* Ad Accounts Tab */}
+          <TabsContent value="ad-accounts" className="space-y-4">
+            {/* Fetch Ad Accounts from Meta */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Facebook className="w-5 h-5" />
+                      Meta 광고 계정 불러오기
+                    </CardTitle>
+                    <CardDescription>
+                      연결된 Facebook 계정의 광고 계정 목록을 불러옵니다.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={fetchMetaAdAccounts}
+                    disabled={loadingMetaAdAccounts}
+                  >
+                    {loadingMetaAdAccounts ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 mr-2" />
+                    )}
+                    광고 계정 불러오기
+                  </Button>
+                </div>
+              </CardHeader>
+              {metaAdAccounts.length > 0 && (
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>계정명</TableHead>
+                        <TableHead>계정 ID</TableHead>
+                        <TableHead>비즈니스</TableHead>
+                        <TableHead>통화</TableHead>
+                        <TableHead className="text-right">작업</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {metaAdAccounts.map((account) => {
+                        const alreadySaved = savedAdAccounts.some(
+                          (s) => s.ad_account_id === account.id
+                        );
+                        return (
+                          <TableRow key={account.id}>
+                            <TableCell className="font-medium">{account.name}</TableCell>
+                            <TableCell className="font-mono text-sm">{account.id}</TableCell>
+                            <TableCell>{account.business_name || "-"}</TableCell>
+                            <TableCell>{account.currency || "-"}</TableCell>
+                            <TableCell className="text-right">
+                              {alreadySaved ? (
+                                <Badge variant="secondary">등록됨</Badge>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSaveAdAccount(account)}
+                                >
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  등록
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              )}
+            </Card>
+
+            {/* Saved Ad Accounts */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>등록된 광고 계정</CardTitle>
+                    <CardDescription>
+                      리드 동기화에 사용할 광고 계정을 관리합니다.
+                    </CardDescription>
+                  </div>
+                  {savedAdAccounts.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={handleSyncAllAdAccounts}
+                      disabled={syncingAllAdAccounts || savedAdAccounts.filter((a) => a.is_active).length === 0}
+                    >
+                      {syncingAllAdAccounts ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      전체 동기화
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* 동기화 날짜 범위 선택 */}
+                {savedAdAccounts.length > 0 && (
+                  <div className="flex items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg">
+                    <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm text-muted-foreground flex-shrink-0">동기화 기간:</span>
+                    <Input
+                      type="date"
+                      value={syncStartDate}
+                      onChange={(e) => setSyncStartDate(e.target.value)}
+                      className="w-40 h-8 text-sm"
+                      placeholder="시작일"
+                    />
+                    <span className="text-sm text-muted-foreground">~</span>
+                    <Input
+                      type="date"
+                      value={syncEndDate}
+                      onChange={(e) => setSyncEndDate(e.target.value)}
+                      className="w-40 h-8 text-sm"
+                      placeholder="종료일"
+                    />
+                    {(syncStartDate || syncEndDate) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          setSyncStartDate("");
+                          setSyncEndDate("");
+                        }}
+                      >
+                        초기화
+                      </Button>
+                    )}
+                    {!syncStartDate && !syncEndDate && (
+                      <span className="text-xs text-muted-foreground">
+                        미선택 시 마지막 동기화 이후 데이터를 가져옵니다
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : savedAdAccounts.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Facebook className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                    <p className="mb-4">등록된 광고 계정이 없습니다.</p>
+                    <p className="text-sm">
+                      위의 &quot;광고 계정 불러오기&quot; 버튼을 클릭하여 Meta 광고 계정을 불러온 후 등록하세요.
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>계정명</TableHead>
+                        <TableHead>계정 ID</TableHead>
+                        <TableHead>마지막 동기화</TableHead>
+                        <TableHead>동기화 결과</TableHead>
+                        <TableHead>활성화</TableHead>
+                        <TableHead className="text-right">작업</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {savedAdAccounts.map((account) => (
+                        <TableRow key={account.id}>
+                          <TableCell className="font-medium">
+                            {account.account_name || "-"}
+                            {account.business_name && (
+                              <div className="text-xs text-muted-foreground">
+                                {account.business_name}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-mono text-sm">{account.ad_account_id}</div>
+                            {account.currency && (
+                              <div className="text-xs text-muted-foreground">{account.currency}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>{formatDate(account.last_sync_at)}</TableCell>
+                          <TableCell>
+                            {getStatusBadge(account.last_sync_status)}
+                          </TableCell>
+                          <TableCell>
+                            <Switch
+                              checked={account.is_active}
+                              onCheckedChange={() => handleToggleAdAccountActive(account)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleSyncAdAccount(account.id)}
+                                disabled={syncingAdAccount === account.id || !account.is_active}
+                                title="동기화"
+                              >
+                                {syncingAdAccount === account.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-4 h-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setSelectedAdAccount(account);
+                                  setIsDeleteAdAccountDialogOpen(true);
+                                }}
+                                title="삭제"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Logs Tab */}
           <TabsContent value="logs" className="space-y-4">
             <Card>
@@ -831,7 +1262,7 @@ export default function MetaIntegrationPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>시작 시간</TableHead>
-                        <TableHead>페이지</TableHead>
+                        <TableHead>소스</TableHead>
                         <TableHead>유형</TableHead>
                         <TableHead>상태</TableHead>
                         <TableHead>가져온 리드</TableHead>
@@ -845,7 +1276,19 @@ export default function MetaIntegrationPage() {
                         <TableRow key={log.id}>
                           <TableCell>{formatDate(log.started_at)}</TableCell>
                           <TableCell className="text-sm">
-                            {log.meta_pages?.page_name || "-"}
+                            {log.page_id && log.meta_pages?.page_name ? (
+                              <div>
+                                <Badge variant="outline" className="text-xs mr-1">페이지</Badge>
+                                {log.meta_pages.page_name}
+                              </div>
+                            ) : log.ad_account_id && log.meta_ad_accounts?.account_name ? (
+                              <div>
+                                <Badge variant="outline" className="text-xs mr-1">광고계정</Badge>
+                                {log.meta_ad_accounts.account_name}
+                              </div>
+                            ) : (
+                              "-"
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
@@ -1046,52 +1489,6 @@ export default function MetaIntegrationPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>광고 계정 (선택)</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={formData.ad_account_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, ad_account_id: value === "__none__" ? "" : value })
-                  }
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="광고 계정을 선택하세요" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">선택 안함</SelectItem>
-                    {adAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} ({account.id})
-                        {account.business_name && ` - ${account.business_name}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchAdAccounts}
-                  disabled={loadingAdAccounts}
-                  className="flex-shrink-0"
-                >
-                  {loadingAdAccounts ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-              {adAccounts.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  &quot;불러오기&quot; 버튼을 클릭하여 Facebook 광고 계정 목록을 가져오세요.
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                광고 계정을 선택하면 페이지 폼 대신 광고 계정 기반으로 리드를 가져옵니다.
-              </p>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="sync_interval">동기화 주기 (분)</Label>
               <Input
                 id="sync_interval"
@@ -1186,52 +1583,6 @@ export default function MetaIntegrationPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>광고 계정 (선택)</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={formData.ad_account_id || "__none__"}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, ad_account_id: value === "__none__" ? "" : value })
-                  }
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="광고 계정을 선택하세요" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">선택 안함</SelectItem>
-                    {adAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} ({account.id})
-                        {account.business_name && ` - ${account.business_name}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchAdAccounts}
-                  disabled={loadingAdAccounts}
-                  className="flex-shrink-0"
-                >
-                  {loadingAdAccounts ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-              {adAccounts.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  &quot;불러오기&quot; 버튼을 클릭하여 Facebook 광고 계정 목록을 가져오세요.
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                광고 계정을 선택하면 페이지 폼 대신 광고 계정 기반으로 리드를 가져옵니다.
-              </p>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="edit_sync_interval">동기화 주기 (분)</Label>
               <Input
                 id="edit_sync_interval"
@@ -1281,6 +1632,29 @@ export default function MetaIntegrationPage() {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeletePage}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Ad Account Confirmation Dialog */}
+      <AlertDialog open={isDeleteAdAccountDialogOpen} onOpenChange={setIsDeleteAdAccountDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>광고 계정 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedAdAccount?.account_name || selectedAdAccount?.ad_account_id} 광고 계정을
+              삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAdAccount}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

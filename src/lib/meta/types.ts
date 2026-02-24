@@ -148,7 +148,6 @@ export interface MetaPageConfig {
   page_id: string;
   page_name: string;
   access_token: string;
-  ad_account_id?: string;
   is_active: boolean;
   last_sync_at?: string;
   last_sync_status?: 'success' | 'error';
@@ -162,7 +161,34 @@ export interface MetaPageInput {
   page_id: string;
   page_name: string;
   access_token: string;
-  ad_account_id?: string;
+  is_active?: boolean;
+  sync_interval_minutes?: number;
+}
+
+// =====================================================
+// Meta Ad Account Configuration Types
+// =====================================================
+
+export interface MetaAdAccountConfig {
+  id: string;
+  ad_account_id: string;
+  account_name?: string;
+  currency?: string;
+  business_name?: string;
+  is_active: boolean;
+  sync_interval_minutes: number;
+  last_sync_at?: string;
+  last_sync_status?: 'success' | 'error';
+  last_sync_message?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MetaAdAccountInput {
+  ad_account_id: string;
+  account_name?: string;
+  currency?: string;
+  business_name?: string;
   is_active?: boolean;
   sync_interval_minutes?: number;
 }
@@ -173,8 +199,12 @@ export interface MetaPageInput {
 
 export interface MetaSyncResult {
   success: boolean;
-  page_id: string;
-  page_name: string;
+  /** 동기화 소스 타입: page(폼 기반) 또는 ad_account(광고 기반) */
+  source_type: 'page' | 'ad_account';
+  /** 소스 ID (page_id 또는 ad_account_id) */
+  source_id: string;
+  /** 소스 이름 (page_name 또는 account_name) */
+  source_name: string;
   leads_fetched: number;
   leads_created: number;
   leads_duplicated: number;
@@ -187,7 +217,8 @@ export interface MetaSyncResult {
 
 export interface MetaSyncLogEntry {
   id: string;
-  page_id: string;
+  page_id?: string;
+  ad_account_id?: string;
   sync_type: 'manual' | 'scheduled' | 'webhook';
   status: 'running' | 'success' | 'error';
   leads_fetched: number;

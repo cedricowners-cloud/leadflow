@@ -35,6 +35,9 @@ export async function GET() {
         *,
         meta_pages (
           page_name
+        ),
+        meta_ad_accounts (
+          account_name
         )
       `)
       .order("started_at", { ascending: false })

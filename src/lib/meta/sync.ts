@@ -26,6 +26,7 @@ import { MetaClient } from './client';
 import { MetaLeadParser, metaLeadParser } from './parser';
 import {
   MetaPageConfig,
+  MetaAdAccountConfig,
   ParsedMetaLead,
   MetaSyncResult,
   MetaSyncLogEntry,
@@ -144,8 +145,9 @@ export class MetaSyncService {
     if (!pageConfig) {
       return {
         success: false,
-        page_id: pageConfigId,
-        page_name: 'Unknown',
+        source_type: 'page',
+        source_id: pageConfigId,
+        source_name: 'Unknown',
         leads_fetched: 0,
         leads_created: 0,
         leads_duplicated: 0,
@@ -183,63 +185,31 @@ export class MetaSyncService {
 
       const allAdIds: string[] = [];
       const allParsedLeads: ParsedMetaLead[] = [];
-      let sourcesProcessed = 0;
 
-      // 광고계정 ID가 설정된 경우 광고계정 기반으로 리드 조회
-      if (pageConfig.ad_account_id) {
-        const adAccountId = pageConfig.ad_account_id.startsWith('act_')
-          ? pageConfig.ad_account_id
-          : `act_${pageConfig.ad_account_id}`;
+      // 페이지 폼 기반으로 리드 조회
+      const formResults = await client.getAllLeadsFromAllForms({
+        since,
+        until,
+        limit: options.maxLeads || 100,
+      });
 
-        const adResults = await client.getAllLeadsFromAdAccount(adAccountId, {
-          since,
-          until,
-          limit: options.maxLeads || 100,
-        });
+      for (const formResult of formResults) {
+        const parsedLeads = this.parser.parseMetaLeads(
+          formResult.leads,
+          formResult.formName
+        );
 
-        for (const adResult of adResults) {
-          const parsedLeads = this.parser.parseMetaLeads(
-            adResult.leads,
-            adResult.adName
-          );
-
-          for (const lead of parsedLeads) {
-            if (lead.ad_id) {
-              allAdIds.push(lead.ad_id);
-            }
+        for (const lead of parsedLeads) {
+          if (lead.ad_id) {
+            allAdIds.push(lead.ad_id);
           }
-
-          allParsedLeads.push(...parsedLeads);
-          totalFetched += adResult.leads.length;
         }
 
-        sourcesProcessed = adResults.length;
-      } else {
-        // 기존 방식: 페이지 폼 기반으로 리드 조회
-        const formResults = await client.getAllLeadsFromAllForms({
-          since,
-          until,
-          limit: options.maxLeads || 100,
-        });
-
-        for (const formResult of formResults) {
-          const parsedLeads = this.parser.parseMetaLeads(
-            formResult.leads,
-            formResult.formName
-          );
-
-          for (const lead of parsedLeads) {
-            if (lead.ad_id) {
-              allAdIds.push(lead.ad_id);
-            }
-          }
-
-          allParsedLeads.push(...parsedLeads);
-          totalFetched += formResult.leads.length;
-        }
-
-        sourcesProcessed = formResults.length;
+        allParsedLeads.push(...parsedLeads);
+        totalFetched += formResult.leads.length;
       }
+
+      const sourcesProcessed = formResults.length;
 
       // 광고 정보 일괄 조회
       const adInfoMap = await client.getAdInfoBatch(allAdIds);
@@ -271,8 +241,9 @@ export class MetaSyncService {
 
       return {
         success: true,
-        page_id: pageConfig.page_id,
-        page_name: pageConfig.page_name,
+        source_type: 'page' as const,
+        source_id: pageConfig.page_id,
+        source_name: pageConfig.page_name,
         leads_fetched: totalFetched,
         leads_created: totalCreated,
         leads_duplicated: totalDuplicated,
@@ -296,8 +267,9 @@ export class MetaSyncService {
 
       return {
         success: false,
-        page_id: pageConfig.page_id,
-        page_name: pageConfig.page_name,
+        source_type: 'page' as const,
+        source_id: pageConfig.page_id,
+        source_name: pageConfig.page_name,
         leads_fetched: 0,
         leads_created: 0,
         leads_duplicated: 0,
@@ -490,16 +462,24 @@ export class MetaSyncService {
    * 동기화 로그 생성
    */
   private async createSyncLog(
-    pageConfigId: string,
-    syncType: string
+    sourceId: string,
+    syncType: string,
+    sourceType: 'page' | 'ad_account' = 'page'
   ): Promise<MetaSyncLogEntry> {
+    const insertData: Record<string, string> = {
+      sync_type: syncType,
+      status: 'running',
+    };
+
+    if (sourceType === 'page') {
+      insertData.page_id = sourceId;
+    } else {
+      insertData.ad_account_id = sourceId;
+    }
+
     const { data, error } = await this.supabase
       .from('meta_sync_logs')
-      .insert({
-        page_id: pageConfigId,
-        sync_type: syncType,
-        status: 'running',
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -524,6 +504,271 @@ export class MetaSyncService {
         completed_at: new Date().toISOString(),
       })
       .eq('id', logId);
+  }
+
+  // =====================================================
+  // Ad Account Sync Methods
+  // =====================================================
+
+  /**
+   * 활성화된 모든 Meta 광고 계정 설정 조회
+   */
+  async getActiveAdAccounts(): Promise<MetaAdAccountConfig[]> {
+    const { data, error } = await this.supabase
+      .from('meta_ad_accounts')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to fetch meta ad accounts: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
+   * 특정 광고 계정 설정 조회
+   */
+  async getAdAccountConfig(adAccountConfigId: string): Promise<MetaAdAccountConfig | null> {
+    const { data, error } = await this.supabase
+      .from('meta_ad_accounts')
+      .select('*')
+      .eq('id', adAccountConfigId)
+      .single();
+
+    if (error) {
+      return null;
+    }
+
+    return data;
+  }
+
+  /**
+   * User Access Token 조회 (meta_app_settings에서)
+   */
+  private async getUserAccessToken(): Promise<string | null> {
+    const { data } = await this.supabase
+      .from('meta_app_settings')
+      .select('user_access_token, user_token_expires_at')
+      .single();
+
+    if (!data?.user_access_token) {
+      return null;
+    }
+
+    // 만료 확인
+    if (data.user_token_expires_at && new Date(data.user_token_expires_at) < new Date()) {
+      return null;
+    }
+
+    return data.user_access_token;
+  }
+
+  /**
+   * 특정 광고 계정 동기화
+   */
+  async syncAdAccount(
+    adAccountConfigId: string,
+    options: SyncOptions = {}
+  ): Promise<MetaSyncResult> {
+    const startedAt = new Date().toISOString();
+
+    // 광고 계정 설정 조회
+    const accountConfig = await this.getAdAccountConfig(adAccountConfigId);
+    if (!accountConfig) {
+      return {
+        success: false,
+        source_type: 'ad_account',
+        source_id: adAccountConfigId,
+        source_name: 'Unknown',
+        leads_fetched: 0,
+        leads_created: 0,
+        leads_duplicated: 0,
+        leads_error: 0,
+        forms_processed: 0,
+        error: 'Ad account configuration not found',
+        started_at: startedAt,
+        completed_at: new Date().toISOString(),
+      };
+    }
+
+    // User Access Token 조회
+    const userAccessToken = await this.getUserAccessToken();
+    if (!userAccessToken) {
+      return {
+        success: false,
+        source_type: 'ad_account',
+        source_id: accountConfig.ad_account_id,
+        source_name: accountConfig.account_name || accountConfig.ad_account_id,
+        leads_fetched: 0,
+        leads_created: 0,
+        leads_duplicated: 0,
+        leads_error: 0,
+        forms_processed: 0,
+        error: 'User Access Token이 없거나 만료되었습니다. Facebook 계정을 다시 연결해주세요.',
+        started_at: startedAt,
+        completed_at: new Date().toISOString(),
+      };
+    }
+
+    // act_ 접두사 보장
+    const adAccountId = accountConfig.ad_account_id.startsWith('act_')
+      ? accountConfig.ad_account_id
+      : `act_${accountConfig.ad_account_id}`;
+
+    // 동기화 로그 생성 (FK가 meta_ad_accounts.ad_account_id를 참조하므로 "act_xxx" 형식 사용)
+    const logEntry = await this.createSyncLog(
+      accountConfig.ad_account_id,
+      options.syncType || 'manual',
+      'ad_account'
+    );
+
+    try {
+      // Meta API 클라이언트 생성 (user access token 사용)
+      const client = new MetaClient({
+        accessToken: userAccessToken,
+        pageId: '', // 광고 계정 기반이므로 pageId 불필요
+      });
+
+      // 날짜 범위 결정
+      const since = options.sinceDate
+        ? options.sinceDate
+        : options.incrementalSync && accountConfig.last_sync_at && !options.forceFullSync
+          ? accountConfig.last_sync_at
+          : undefined;
+
+      const until = options.untilDate || undefined;
+
+      // 광고 계정 기반으로 리드 조회
+      const adResults = await client.getAllLeadsFromAdAccount(adAccountId, {
+        since,
+        until,
+        limit: options.maxLeads || 100,
+      });
+
+      const allAdIds: string[] = [];
+      const allParsedLeads: ParsedMetaLead[] = [];
+      let totalFetched = 0;
+
+      for (const adResult of adResults) {
+        const parsedLeads = this.parser.parseMetaLeads(
+          adResult.leads,
+          adResult.adName
+        );
+
+        for (const lead of parsedLeads) {
+          if (lead.ad_id) {
+            allAdIds.push(lead.ad_id);
+          }
+        }
+
+        allParsedLeads.push(...parsedLeads);
+        totalFetched += adResult.leads.length;
+      }
+
+      // 광고 정보 일괄 조회
+      const adInfoMap = await client.getAdInfoBatch(allAdIds);
+
+      // 광고 정보 병합
+      const enrichedLeads = allParsedLeads.map((lead) => {
+        if (lead.ad_id && adInfoMap.has(lead.ad_id)) {
+          return this.parser.mergeAdInfo(lead, adInfoMap.get(lead.ad_id)!);
+        }
+        return lead;
+      });
+
+      // 데이터베이스에 저장
+      const saveResult = await this.saveLeads(enrichedLeads, adAccountConfigId);
+
+      // 광고 계정 동기화 상태 업데이트
+      await this.updateAdAccountSyncStatus(adAccountConfigId, 'success');
+
+      // 동기화 로그 업데이트
+      await this.updateSyncLog(logEntry.id, {
+        status: 'success',
+        leads_fetched: totalFetched,
+        leads_created: saveResult.created,
+        leads_duplicated: saveResult.duplicated,
+      });
+
+      return {
+        success: true,
+        source_type: 'ad_account',
+        source_id: accountConfig.ad_account_id,
+        source_name: accountConfig.account_name || accountConfig.ad_account_id,
+        leads_fetched: totalFetched,
+        leads_created: saveResult.created,
+        leads_duplicated: saveResult.duplicated,
+        leads_error: saveResult.errors,
+        forms_processed: adResults.length,
+        started_at: startedAt,
+        completed_at: new Date().toISOString(),
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
+      // 광고 계정 동기화 상태 업데이트
+      await this.updateAdAccountSyncStatus(adAccountConfigId, 'error', errorMessage);
+
+      // 동기화 로그 업데이트
+      await this.updateSyncLog(logEntry.id, {
+        status: 'error',
+        error_message: errorMessage,
+      });
+
+      return {
+        success: false,
+        source_type: 'ad_account',
+        source_id: accountConfig.ad_account_id,
+        source_name: accountConfig.account_name || accountConfig.ad_account_id,
+        leads_fetched: 0,
+        leads_created: 0,
+        leads_duplicated: 0,
+        leads_error: 0,
+        forms_processed: 0,
+        error: errorMessage,
+        started_at: startedAt,
+        completed_at: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * 모든 활성 광고 계정 동기화
+   */
+  async syncAllAdAccounts(options: SyncOptions = {}): Promise<MetaSyncResult[]> {
+    const accounts = await this.getActiveAdAccounts();
+    const results: MetaSyncResult[] = [];
+
+    for (const account of accounts) {
+      const result = await this.syncAdAccount(account.id, options);
+      results.push(result);
+
+      // Rate limit 보호
+      await this.delay(1000);
+    }
+
+    return results;
+  }
+
+  /**
+   * 광고 계정 동기화 상태 업데이트
+   */
+  private async updateAdAccountSyncStatus(
+    adAccountConfigId: string,
+    status: 'success' | 'error',
+    message?: string
+  ): Promise<void> {
+    await this.supabase
+      .from('meta_ad_accounts')
+      .update({
+        last_sync_at: new Date().toISOString(),
+        last_sync_status: status,
+        last_sync_message: message || null,
+      })
+      .eq('id', adAccountConfigId);
   }
 
   private delay(ms: number): Promise<void> {

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -124,6 +124,100 @@ export async function GET() {
           error instanceof Error
             ? error.message
             : "광고 계정 조회 중 오류가 발생했습니다.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/meta/ad-accounts
+ *
+ * 선택한 광고 계정을 DB에 저장
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    // 인증 확인
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 권한 확인 (시스템 관리자만)
+    const { data: member } = await supabase
+      .from("members")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!member || member.role !== "system_admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { ad_account_id, account_name, currency, business_name } = body as {
+      ad_account_id: string;
+      account_name?: string;
+      currency?: string;
+      business_name?: string;
+    };
+
+    if (!ad_account_id) {
+      return NextResponse.json(
+        { error: "ad_account_id는 필수입니다." },
+        { status: 400 }
+      );
+    }
+
+    const adminClient = createAdminClient();
+
+    // 중복 확인
+    const { data: existing } = await adminClient
+      .from("meta_ad_accounts")
+      .select("id")
+      .eq("ad_account_id", ad_account_id)
+      .single();
+
+    if (existing) {
+      return NextResponse.json(
+        { error: "이미 등록된 광고 계정입니다." },
+        { status: 409 }
+      );
+    }
+
+    // 저장
+    const { data, error } = await adminClient
+      .from("meta_ad_accounts")
+      .insert({
+        ad_account_id,
+        account_name: account_name || null,
+        currency: currency || null,
+        business_name: business_name || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json(
+        { error: `저장 실패: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error("Ad account save error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "광고 계정 저장 중 오류가 발생했습니다.",
       },
       { status: 500 }
     );
