@@ -61,6 +61,7 @@ export interface LeadFiltersValue {
   meetingStatusId: string;
   contractStatusId: string;
   assignedStatus: "all" | "assigned" | "unassigned";
+  dateFilterType: "source_date" | "created_at";
   startDate: Date | undefined;
   endDate: Date | undefined;
 }
@@ -146,6 +147,7 @@ export function LeadFilters({
       meetingStatusId: "",
       contractStatusId: "",
       assignedStatus: "all",
+      dateFilterType: "source_date",
       startDate: undefined,
       endDate: undefined,
     });
@@ -371,11 +373,39 @@ export function LeadFilters({
                 </Select>
               </div>
 
-              {/* 등록일 범위 */}
+              {/* 날짜 범위 필터 */}
               <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">
-                  등록일 범위
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-muted-foreground">
+                    날짜 범위
+                  </label>
+                  <div className="flex rounded-md border text-xs">
+                    <button
+                      type="button"
+                      className={cn(
+                        "px-2 py-0.5 rounded-l-md transition-colors",
+                        value.dateFilterType === "source_date"
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-muted"
+                      )}
+                      onClick={() => handleChange("dateFilterType", "source_date")}
+                    >
+                      신청일
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        "px-2 py-0.5 rounded-r-md transition-colors",
+                        value.dateFilterType === "created_at"
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-muted"
+                      )}
+                      onClick={() => handleChange("dateFilterType", "created_at")}
+                    >
+                      등록일
+                    </button>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <Popover>
                     <PopoverTrigger asChild>

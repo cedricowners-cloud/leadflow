@@ -21,6 +21,7 @@ const querySchema = z.object({
   contractStatusId: z.string().uuid().optional(),
   assignedStatus: z.enum(["all", "assigned", "unassigned"]).default("all"),
   leadType: z.enum(["all", "sales", "recruit"]).default("sales"),
+  dateFilterType: z.enum(["source_date", "created_at"]).default("source_date"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   sortBy: z.string().default("source_date"),
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
       contractStatusId: searchParams.get("contractStatusId") || undefined,
       assignedStatus: searchParams.get("assignedStatus") || "all",
       leadType: searchParams.get("leadType") || "sales",
+      dateFilterType: searchParams.get("dateFilterType") || "source_date",
       startDate: searchParams.get("startDate") || undefined,
       endDate: searchParams.get("endDate") || undefined,
       sortBy: searchParams.get("sortBy") || "source_date",
@@ -177,13 +179,14 @@ export async function GET(request: NextRequest) {
       else if (params.assignedStatus === "unassigned")
         query = query.is("assigned_member_id", null);
       if (params.leadType !== "all") query = query.eq("lead_type", params.leadType);
+      const dateColumn = params.dateFilterType === "created_at" ? "created_at" : "source_date";
       if (params.startDate) {
         const kstStart = `${params.startDate}T00:00:00+09:00`;
-        query = query.gte("source_date", kstStart);
+        query = query.gte(dateColumn, kstStart);
       }
       if (params.endDate) {
         const kstEnd = `${params.endDate}T23:59:59+09:00`;
-        query = query.lte("source_date", kstEnd);
+        query = query.lte(dateColumn, kstEnd);
       }
     }
 

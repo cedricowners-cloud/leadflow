@@ -59,6 +59,7 @@ const initialFilters: LeadFiltersValue = {
   meetingStatusId: "",
   contractStatusId: "",
   assignedStatus: "all",
+  dateFilterType: "source_date",
   startDate: undefined,
   endDate: undefined,
 };
@@ -160,6 +161,8 @@ export default function LeadsPage() {
         params.set("contractStatusId", filters.contractStatusId);
       if (filters.assignedStatus !== "all")
         params.set("assignedStatus", filters.assignedStatus);
+      if (filters.dateFilterType !== "source_date")
+        params.set("dateFilterType", filters.dateFilterType);
       if (filters.startDate) {
         const d = filters.startDate;
         params.set("startDate", `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
@@ -276,6 +279,8 @@ export default function LeadsPage() {
         params.set("contractStatusId", filters.contractStatusId);
       if (filters.assignedStatus !== "all")
         params.set("assignedStatus", filters.assignedStatus);
+      if (filters.dateFilterType !== "source_date")
+        params.set("dateFilterType", filters.dateFilterType);
       if (filters.startDate) {
         const d = filters.startDate;
         params.set("startDate", `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);

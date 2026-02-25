@@ -15,6 +15,7 @@ const querySchema = z.object({
   contractStatusId: z.string().uuid().optional(),
   assignedStatus: z.enum(["all", "assigned", "unassigned"]).default("all"),
   leadType: z.enum(["all", "sales", "recruit"]).default("sales"),
+  dateFilterType: z.enum(["source_date", "created_at"]).default("source_date"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   sortBy: z.string().default("source_date"),
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
       contractStatusId: searchParams.get("contractStatusId") || undefined,
       assignedStatus: searchParams.get("assignedStatus") || "all",
       leadType: searchParams.get("leadType") || "sales",
+      dateFilterType: searchParams.get("dateFilterType") || "source_date",
       startDate: searchParams.get("startDate") || undefined,
       endDate: searchParams.get("endDate") || undefined,
       sortBy: searchParams.get("sortBy") || "source_date",
@@ -89,6 +91,7 @@ export async function GET(request: NextRequest) {
       contractStatusId,
       assignedStatus,
       leadType,
+      dateFilterType,
       startDate,
       endDate,
       sortBy,
@@ -205,14 +208,15 @@ export async function GET(request: NextRequest) {
       query = query.eq("lead_type", leadType);
     }
 
-    // 날짜 필터 (신청일 source_date 기준, KST 타임존 적용)
+    // 날짜 필터 (신청일 source_date 또는 등록일 created_at 기준, KST 타임존 적용)
+    const dateColumn = dateFilterType === "created_at" ? "created_at" : "source_date";
     if (startDate) {
       const kstStart = `${startDate}T00:00:00+09:00`;
-      query = query.gte("source_date", kstStart);
+      query = query.gte(dateColumn, kstStart);
     }
     if (endDate) {
       const kstEnd = `${endDate}T23:59:59+09:00`;
-      query = query.lte("source_date", kstEnd);
+      query = query.lte(dateColumn, kstEnd);
     }
 
     // 정렬
